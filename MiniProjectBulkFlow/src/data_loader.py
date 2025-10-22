@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 
 
+
 def load_rockstar_catalog(path: str, columns=None) -> pd.DataFrame:
     """
     Load the Rockstar halo catalog.
