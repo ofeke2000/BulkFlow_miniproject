@@ -1,7 +1,7 @@
 box_size: 1000.0           # h^-1 Mpc
 overdensity_radius: 5.0    # h^-1 Mpc
 bulkflow_error: 0.2        # 20%
-bulkflow_step: 50.0        # h^-1 Mpc
+bulkflow_step: 5.0        # h^-1 Mpc
 mask_type: cf4             # "cf4" or "uniform"
 max_radius: 250.0          # h^-1 Mpc
-min_radius: 50.0           # h^-1 Mpc
+min_radius: 5.0           # h^-1 Mpc
