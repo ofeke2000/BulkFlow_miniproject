@@ -3,5 +3,34 @@ overdensity_radius: 5.0    # h^-1 Mpc
 bulkflow_error: 0.2        # 20%
 bulkflow_step: 5.0        # h^-1 Mpc
 mask_type: cf4             # "cf4" or "uniform"
-max_radius: 250.0          # h^-1 Mpc
-min_radius: 5.0           # h^-1 Mpc
+
+
+input_csv: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/mdpl2_rockstar_125_pid-1_mvir12.csv"
+output_dir: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series"
+
+columns:
+  - mvir
+  - rvir
+  - rs
+  - rockstarid
+  - pid
+  - x
+  - y
+  - z
+  - vx
+  - vy
+  - vz
+
+overdensity:
+  radius: 5.0
+
+experiment:
+  n_lowest_delta: 50
+  max_radius: 250.0          # h^-1 Mpc
+  min_radius: 5.0           # h^-1 Mpc
+  radii_step: 5
+  error_fraction: 0.2
+  parallel: true
+
+visualization:
+  projection_plane: "xy"
