@@ -34,9 +34,9 @@ def load_rockstar_catalog(path: str, columns=None) -> pd.DataFrame:
     return df
 
 
-def load_cf4_catalog(path: str) -> pd.DataFrame:
+def load_cf4_catalogue(path: str) -> pd.DataFrame:
     """
-    Load the CosmicFlows-4 (CF4) groups catalog.
+    Load the CosmicFlows-4 (CF4) groups catalogue.
 
     Parameters
     ----------
@@ -49,7 +49,7 @@ def load_cf4_catalog(path: str) -> pd.DataFrame:
         DataFrame with relevant columns such as:
         'GroupID', 'RA', 'Dec', 'Dist_Mpc', 'Vpec', 'sigma_D', etc.
     """
-    print(f"Loading CF4 catalog from {path}...")
+    print(f"Loading CF4 catalogue from {path}...")
     df = pd.read_csv(path)
     print(f"Loaded {len(df):,} CF4 entries.")
 
@@ -66,6 +66,11 @@ def load_cf4_catalog(path: str) -> pd.DataFrame:
     # Remove entries with missing distances
     df = df.dropna(subset=['distance'])
     print(f"After cleaning: {len(df):,} groups remain.")
+
+    # Convert coordinates to Cartesian
+    df = cf4_to_cartesian(df)
+
+    
     return df
 
 
