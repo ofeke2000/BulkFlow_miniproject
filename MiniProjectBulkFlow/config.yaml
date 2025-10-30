@@ -1,7 +1,4 @@
 box_size: 1000.0           # h^-1 Mpc
-overdensity_radius: 5.0    # h^-1 Mpc
-bulkflow_error: 0.2        # 20%
-bulkflow_step: 5.0        # h^-1 Mpc
 mask_type: cf4             # "cf4" or "uniform"
 
 
@@ -22,14 +19,14 @@ columns:
   - vz
 
 overdensity:
-  radius: 5.0
+  radius: 5.0    # h^-1 Mpc
 
 experiment:
   n_lowest_delta: 50
   max_radius: 250.0          # h^-1 Mpc
-  min_radius: 5.0           # h^-1 Mpc
-  radii_step: 5
-  error_fraction: 0.2
+  min_radius: 5.0            # h^-1 Mpc
+  radii_step: 5              # h^-1 Mpc
+  error_fraction: 0.2        # 20%
   parallel: true
 
 visualization:
