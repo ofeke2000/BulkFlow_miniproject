@@ -55,11 +55,11 @@ def load_cf4_catalogue(path: str) -> pd.DataFrame:
 
     # Rename for consistency
     rename_map = {
-        'GroupID': 'id',
+        'PGC': 'id',
         'RA': 'ra',
-        'Dec': 'dec',
-        'Dist_Mpc': 'distance',
-        'Vpec': 'vpec'
+        'DE': 'dec',
+        'DM_av': 'distance_modulus',
+        'Vcmb': 'Vcmb'
     }
     df = df.rename(columns=rename_map)
 
@@ -70,7 +70,7 @@ def load_cf4_catalogue(path: str) -> pd.DataFrame:
     # Convert coordinates to Cartesian
     df = cf4_to_cartesian(df)
 
-    
+
     return df
 
 
