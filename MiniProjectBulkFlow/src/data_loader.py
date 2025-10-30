@@ -64,11 +64,15 @@ def load_cf4_catalogue(path: str) -> pd.DataFrame:
     df = df.rename(columns=rename_map)
 
     # Remove entries with missing distances
-    df = df.dropna(subset=['distance'])
+    df = df.dropna(subset=['distance_modulus'])
     print(f"After cleaning: {len(df):,} groups remain.")
+
+    # Convert distance modulus to distance in Mpc/h
+    df['distance'] = distance_modulus_to_mpc(df['distance_modulus'].values)
 
     # Convert coordinates to Cartesian
     df = cf4_to_cartesian(df)
+    print("Converted RA/Dec/Dist → Cartesian (x, y, z).")
 
 
     return df
@@ -95,3 +99,27 @@ def cf4_to_cartesian(df: pd.DataFrame) -> pd.DataFrame:
     df['y'] = df['distance'] * np.cos(dec_rad) * np.sin(ra_rad)
     df['z'] = df['distance'] * np.sin(dec_rad)
     return df
+
+
+def distance_modulus_to_mpc(mu: float | np.ndarray, h: float = 0.7) -> np.ndarray:
+    """
+    Convert distance modulus to comoving distance in Mpc/h.
+
+    Parameters
+    ----------
+    mu : float or array-like
+        Distance modulus (m - M).
+    h : float, optional
+        Hubble parameter normalization (H0 / 100). Default is 0.7.
+
+    Returns
+    -------
+    distance_mpch : numpy.ndarray
+        Comoving distance in Mpc/h.
+    """
+    # Convert to luminosity distance in Mpc
+    d_l_mpc = (10 ** ((mu - 25) / 5))/(10**6)
+
+    # Convert to comoving distance in Mpc/h
+    distance = d_l_mpc * h
+    return distance
