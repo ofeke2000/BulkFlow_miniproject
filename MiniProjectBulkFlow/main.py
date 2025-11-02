@@ -55,14 +55,14 @@ def main():
     logger.info("Computing local overdensity δ₅ ...")
     radius = config["overdensity"]["radius"]
     df = compute_overdensity(df, radius=radius)
-    save_dataframe(df[["rockstarid", "delta_5"]], os.path.join(OUTPUT_DIR, "delta5_table.csv"))
+    save_dataframe(df[["rockstarid", f"delta_{int(radius)}"]], os.path.join(OUTPUT_DIR, "delta5_table.csv"))
 
     histogram_overdensity(df, OUTPUT_DIR)
     scatter_overdensity(df, OUTPUT_DIR)
     projection_overdensity(df, OUTPUT_DIR, plane=config["visualization"]["projection_plane"])
 
     n_lowest = config["experiment"]["n_lowest_delta"]
-    df_sorted = df.sort_values(by="delta_5", key=abs).head(n_lowest)
+    df_sorted = df.sort_values(by=f"delta_{int(radius)}", key=abs).head(n_lowest)
     start_points = df_sorted[["x", "y", "z"]].values
     logger.info(f"Selected {n_lowest} lowest-|δ₅| halos as starting points.")
 

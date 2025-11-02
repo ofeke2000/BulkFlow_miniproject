@@ -64,15 +64,16 @@ def compute_overdensity(df: pd.DataFrame, radius: float = 5.0, box_size: float =
         if i % 10000 == 0 and i > 0:
             print(f"  Processed {i:,} halos...")
 
+
     print("Done computing overdensity values.")
-    return pd.DataFrame({
-        'rockstarid': df['rockstarid'],
-        f'delta_{int(radius)}': overdensity
-    })
+    # Add the new delta column to the original dataframe
+    df[f'delta_{int(radius)}'] = overdensity
+
+    return df
 
 
 ################################################################
-# NOT IN USE: Already implemented in compute_overdensity()
+# NOT IN USE
 ################################################################
 
 def merge_overdensity(df_original: pd.DataFrame, df_delta: pd.DataFrame, radius: float = 5.0) -> pd.DataFrame:  
