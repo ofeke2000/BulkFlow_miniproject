@@ -18,7 +18,7 @@ import pandas as pd
 from scipy.spatial import cKDTree
 
 
-def compute_overdensity(df: pd.DataFrame, radius: float = 5.0, mass_column: str = "mvir") -> pd.DataFrame:
+def compute_overdensity(df: pd.DataFrame, radius: float = 5.0, box_size: float = 1000.0, mass_column: str = "mvir") -> pd.DataFrame:
     """
     Compute overdensity delta_R for each halo within a sphere of given radius.
 
@@ -41,14 +41,14 @@ def compute_overdensity(df: pd.DataFrame, radius: float = 5.0, mass_column: str 
 
     # Compute mean mass density (in simulation box units)
     print("Computing mean density...")
-    box_volume = (df[['x', 'y', 'z']].max() - df[['x', 'y', 'z']].min()).prod()
+    box_volume = box_size**3
     total_mass = df[mass_column].sum()
     rho_mean = total_mass / box_volume
 
     print(f"Mean mass density = {rho_mean:.3e}")
 
     # Prepare results
-    delta_values = np.zeros(len(df), dtype=np.float64)
+    overdensity = np.zeros(len(df), dtype=np.float64)
 
     # Precompute volume of sphere
     V_R = (4.0 / 3.0) * np.pi * radius**3
@@ -59,7 +59,7 @@ def compute_overdensity(df: pd.DataFrame, radius: float = 5.0, mass_column: str 
         idx = tree.query_ball_point(pos, r=radius)
         local_mass = df.iloc[idx][mass_column].sum()
         rho_local = local_mass / V_R
-        delta_values[i] = (rho_local - rho_mean) / rho_mean
+        overdensity[i] = (rho_local - rho_mean) / rho_mean
 
         if i % 10000 == 0 and i > 0:
             print(f"  Processed {i:,} halos...")
@@ -67,11 +67,15 @@ def compute_overdensity(df: pd.DataFrame, radius: float = 5.0, mass_column: str 
     print("Done computing overdensity values.")
     return pd.DataFrame({
         'rockstarid': df['rockstarid'],
-        f'delta_{int(radius)}': delta_values
+        f'delta_{int(radius)}': overdensity
     })
 
 
-def merge_overdensity(df_original: pd.DataFrame, df_delta: pd.DataFrame, radius: float = 5.0) -> pd.DataFrame:
+################################################################
+# NOT IN USE: Already implemented in compute_overdensity()
+################################################################
+
+def merge_overdensity(df_original: pd.DataFrame, df_delta: pd.DataFrame, radius: float = 5.0) -> pd.DataFrame:  
     """
     Merge overdensity results into the original halo catalog.
 

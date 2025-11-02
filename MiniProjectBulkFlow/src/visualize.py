@@ -164,7 +164,7 @@ def plot_bulkflow_vectors(centers, vectors, output_dir, title="Bulk Flow Vectors
 # ================================================================
 
 @timing
-def histogram_delta5(df, output_dir, bins=100):
+def histogram_overdensity(df, output_dir, bins=100):
     """Plot histogram of δ₅ values."""
     ensure_dir(output_dir)
 

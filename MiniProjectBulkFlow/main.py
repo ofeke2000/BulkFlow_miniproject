@@ -4,13 +4,13 @@ import pandas as pd
 import yaml
 from utils import setup_logger, ensure_dir, timing
 from data_loader import load_rockstar_catalog
-from overdensity import compute_delta5
+from overdensity import compute_overdensity
 from masks import create_cf4_mask, create_uniform_mask
 from experiment import run_bulkflow_experiment
 from visualize import (
     scatter_overdensity,
     projection_overdensity,
-    histogram_delta5,
+    histogram_overdensity,
 )
 from utils import save_dataframe
 
@@ -54,10 +54,10 @@ def main():
     # ------------------------------------------------------------
     logger.info("Computing local overdensity δ₅ ...")
     radius = config["overdensity"]["radius"]
-    df = compute_delta5(df, radius=radius)
+    df = compute_overdensity(df, radius=radius)
     save_dataframe(df[["rockstarid", "delta_5"]], os.path.join(OUTPUT_DIR, "delta5_table.csv"))
 
-    histogram_delta5(df, OUTPUT_DIR)
+    histogram_overdensity(df, OUTPUT_DIR)
     scatter_overdensity(df, OUTPUT_DIR)
     projection_overdensity(df, OUTPUT_DIR, plane=config["visualization"]["projection_plane"])
 
