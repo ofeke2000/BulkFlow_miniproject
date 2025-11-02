@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import yaml
 from utils import setup_logger, ensure_dir, timing
-from data_loader import load_data
+from data_loader import load_rockstar_catalog
 from overdensity import compute_delta5
 from masks import create_cf4_mask, create_uniform_mask
 from experiment import run_bulkflow_experiment
@@ -46,7 +46,7 @@ def main():
     # ------------------------------------------------------------
     # 1. Load simulation halo data
     # ------------------------------------------------------------
-    df = load_data(INPUT_CSV, usecols=config["columns"])
+    df = load_rockstar_catalog(INPUT_CSV, usecols=config["columns"])
     logger.info(f"Loaded {len(df)} halos from Rockstar catalogue.")
 
     # ------------------------------------------------------------
