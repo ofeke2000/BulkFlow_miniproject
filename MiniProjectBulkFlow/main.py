@@ -3,9 +3,9 @@ import os
 import pandas as pd
 import yaml
 from utils import setup_logger, ensure_dir, timing
-from data_loader import load_rockstar_catalog
+from data_loader import load_rockstar_catalog, load_cf4_catalogue
 from overdensity import compute_overdensity
-from masks import create_cf4_mask, create_uniform_mask
+from masks import make_cf4_mask, make_uniform_mask
 from experiment import run_bulkflow_experiment
 from visualize import (
     scatter_overdensity,
@@ -29,6 +29,7 @@ def load_config(path):
 config = load_config(CONFIG_PATH)
 
 INPUT_CSV = os.path.expanduser(config["input_csv"])
+CF4_CSV = os.path.expanduser(config["cf4_csv"])
 OUTPUT_DIR = os.path.expanduser(config["output_dir"])
 ensure_dir(OUTPUT_DIR)
 LOG_PATH = os.path.join(OUTPUT_DIR, "run.log")
@@ -47,6 +48,7 @@ def main():
     # 1. Load simulation halo data
     # ------------------------------------------------------------
     df = load_rockstar_catalog(INPUT_CSV, usecols=config["columns"])
+    cf4_df = load_cf4_catalogue(CF4_CSV)
     logger.info(f"Loaded {len(df)} halos from Rockstar catalogue.")
 
     # ------------------------------------------------------------
@@ -70,8 +72,8 @@ def main():
     # 3. Create masks
     # ------------------------------------------------------------
     logger.info("Creating CF4 and uniform masks ...")
-    cf4_mask = create_cf4_mask(df)
-    uniform_mask = create_uniform_mask(df, size=len(cf4_mask))
+    cf4_mask = make_cf4_mask(df, cf4_df, radius=1.0)
+    uniform_mask = make_uniform_mask(df, size=len(cf4_mask))
 
     # Save mask info (optional, for reproducibility)
     save_dataframe(cf4_mask, os.path.join(OUTPUT_DIR, "cf4_mask.csv"))

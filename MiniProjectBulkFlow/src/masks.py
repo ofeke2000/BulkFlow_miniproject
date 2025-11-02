@@ -15,10 +15,10 @@ import pandas as pd
 from scipy.spatial import cKDTree
 
 
-def make_cf4_like_mask(halos_df: pd.DataFrame,
+def make_cf4_mask(halos_df: pd.DataFrame,
                        cf4_df: pd.DataFrame,
                        radius: float = 1.0,
-                       max_doublings: int = 3) -> pd.DataFrame:
+                       max_doublings: int = 4) -> pd.DataFrame:
     """
     Create a one-to-one CF4-like halo sample from the simulation.
 

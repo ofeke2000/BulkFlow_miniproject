@@ -1,8 +1,8 @@
 box_size: 1000.0           # h^-1 Mpc
 mask_type: cf4             # "cf4" or "uniform"
 
-
 input_csv: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/mdpl2_rockstar_125_pid-1_mvir12.csv"
+cf4_csv: "~/bulk-flow-Rockstar/Data/cf4_group_catalogue/cf4_group_catalogue.csv"
 output_dir: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series"
 
 columns:
@@ -28,6 +28,8 @@ experiment:
   radii_step: 5              # h^-1 Mpc
   error_fraction: 0.2        # 20%
   parallel: true
+  n_workers: max(1, cpu_count() - 1)  # parallel workers (set to 1 to run single-threaded)
+
 
 visualization:
   projection_plane: "xy"

@@ -33,53 +33,8 @@ import pandas as pd
 # ----- Project modules (adjust imports if you put files into different package layout) -----
 # Example paths assume `data_loader`, `masking`, `analysis` packages as discussed
 from data_loader import load_rockstar_catalog, load_cf4_catalog, cf4_to_cartesian
-from masking import make_cf4_like_mask, make_uniform_mask
+from masks import make_cf4_mask, make_uniform_mask
 from analysis.bulkflow import compute_bulkflow_series
-
-# -------------------------
-# CONFIG / PATHS (edit these)
-# -------------------------
-# Paths: change these to your actual files if needed
-PATHS = {
-    "rockstar_csv": os.path.expanduser(
-        "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/mdpl2_rockstar_125_pid-1_mvir12.csv"
-    ),
-    # This should be the merged rockstar file that already includes 'delta_5' column.
-    "rockstar_with_delta5_csv": os.path.expanduser(
-        "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series/mdpl2_rockstar_with_delta5_full.csv"
-    ),
-    "cf4_groups_csv": os.path.expanduser(
-        "~/bulk-flow-Rockstar/Data/cf4/CF4_groups_example.csv"   # <- replace with your CF4 groups file
-    ),
-    "output_dir": os.path.expanduser(
-        "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series/experiments"
-    )
-}
-
-# Numeric config
-CONFIG = {
-    "n_origins": 50,               # number of origins to select (closest to delta_5 == 0)
-    "match_radius_start": 1.0,     # initial r_match for CF4->halo matching (h^-1 Mpc)
-    "max_doublings": 3,            # doubling steps: 1 -> 2 -> 4 -> 8 (max)
-    "radii": np.arange(5, 251, 5), # 5, 10, ..., 250
-    "error_frac": 0.20,            # 20% fractional error on radial velocities
-    "min_sigma": 50.0,             # min velocity sigma (km/s)
-    "min_count": 10,               # minimal objects per radius to compute BF
-    "box_size": 1000.0,            # simulation box size (h^-1 Mpc) - adjust if needed
-    "n_workers": max(1, cpu_count() - 1)  # parallel workers (set to 1 to run single-threaded)
-}
-
-# Ensure output dir exists
-os.makedirs(PATHS["output_dir"], exist_ok=True)
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger("experiment")
-
 
 # -------------------------
 # Helper utilities
@@ -143,7 +98,7 @@ def process_origin(origin_row: pd.Series,
     cf4_shifted = shift_cf4_positions(cf4_cart, origin_coords, cfg['box_size'])
 
     # Build CF4-like mask (one-to-one)
-    cf4_mask = make_cf4_like_mask(
+    cf4_mask = make_cf4_mask(
         halos_df,
         cf4_shifted,
         radius=cfg['match_radius_start'],
