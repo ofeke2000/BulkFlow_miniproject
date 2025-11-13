@@ -77,12 +77,15 @@ def make_cf4_mask(halos_df: pd.DataFrame,
             'x': halos_df.iloc[j_closest]['x'],
             'y': halos_df.iloc[j_closest]['y'],
             'z': halos_df.iloc[j_closest]['z'],
+            'vx': halos_df.iloc[j_closest]['vx'],
+            'vy': halos_df.iloc[j_closest]['vy'],
+            'vz': halos_df.iloc[j_closest]['vz'],
             'cf4_id': cf4_id,
             'match_distance': np.min(distances)
         })
 
-        if (i + 1) % 1000 == 0:
-            print(f"  Matched {i+1:,}/{len(cf4_df):,} CF4 groups...")
+        if (i + 1) % 10000 == 0:
+            print(f"  Matched {i+1:,}/{len(cf4_df):,} CF4 groups")
 
     matched_halos = pd.DataFrame(matched_rows)
     print(f"Matched {len(matched_halos):,} CF4 groups to halos.")

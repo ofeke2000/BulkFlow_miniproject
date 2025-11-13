@@ -6,11 +6,7 @@ cf4_csv: "~/bulk-flow-Rockstar/Data/cf4_group_catalogue/cf4_group_catalogue.csv"
 output_dir: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series"
 
 columns:
-  - mvir
-  - rvir
-  - rs
   - rockstarid
-  - pid
   - x
   - y
   - z
