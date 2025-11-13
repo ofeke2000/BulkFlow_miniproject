@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import logging
 import time
-from multiprocessing import cpu_count
 from functools import wraps
 
 
@@ -49,6 +48,17 @@ def timing(func):
         return result
     return wrapper
 
+def progress_bar(iterable, prefix="", size=60):
+    """Simple text-based progress bar."""
+    count = len(iterable)
+    def show(j):
+        x = int(size * j / count)
+        print(f"{prefix}[{'#' * x}{'.' * (size - x)}] {j}/{count}", end="\r")
+    for i, item in enumerate(iterable):
+        yield item
+        show(i + 1)
+    print()
+
 
 # ================================================================
 # File & directory utilities
@@ -67,57 +77,5 @@ def save_dataframe(df: pd.DataFrame, path: str):
     print(f"[INFO] Saved: {path}")
 
 
-# ================================================================
-# Distance computations
-# ================================================================
 
-def distance(x1, y1, z1, x2, y2, z2):
-    """Compute Euclidean distance between two points or arrays."""
-    return np.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
-
-
-# ================================================================
-# Parallelism utilities
-# ================================================================
-
-def get_available_cores(fraction: float = 0.9):
-    """
-    Returns the number of CPU cores to use, leaving a safety margin.
-    Default uses 90% of available cores.
-    """
-    total = cpu_count()
-    use = max(1, int(total * fraction))
-    print(f"[INFO] Using {use}/{total} CPU cores.")
-    return use
-
-
-# ================================================================
-# Miscellaneous utilities
-# ================================================================
-
-def weighted_average(values, weights):
-    """Compute weighted average safely."""
-    values = np.asarray(values)
-    weights = np.asarray(weights)
-    if np.sum(weights) == 0:
-        return np.nan
-    return np.sum(values * weights) / np.sum(weights)
-
-
-def load_halo_data(path: str, usecols=None):
-    """Convenient wrapper for reading Rockstar CSV files."""
-    print(f"[INFO] Loading halo data from: {path}")
-    return pd.read_csv(path, usecols=usecols)
-
-
-def progress_bar(iterable, prefix="", size=60):
-    """Simple text-based progress bar."""
-    count = len(iterable)
-    def show(j):
-        x = int(size * j / count)
-        print(f"{prefix}[{'#' * x}{'.' * (size - x)}] {j}/{count}", end="\r")
-    for i, item in enumerate(iterable):
-        yield item
-        show(i + 1)
-    print()
 
