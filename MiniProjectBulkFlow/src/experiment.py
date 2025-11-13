@@ -47,17 +47,6 @@ def wrap_positions_to_box(df: pd.DataFrame, box_size: float, pos_cols=("x", "y",
     return df
 
 
-def shift_cf4_positions(cf4_cart: pd.DataFrame, origin: tuple, box_size: float) -> pd.DataFrame:
-    """
-    Shift CF4 cartesian positions (which are observer-centered at (0,0,0)) to simulation frame
-    where the CF4 observer sits at `origin`. Then wrap positions into the simulation box.
-    """
-    shifted = cf4_cart.copy()
-    shifted[['x', 'y', 'z']] = shifted[['x', 'y', 'z']].values + np.array(origin).reshape((1, 3))
-    shifted = wrap_positions_to_box(shifted, box_size)
-    return shifted
-
-
 def select_candidate_origins(halo_df: pd.DataFrame, n_origins: int = 50, delta_col: str = "delta_5") -> pd.DataFrame:
     """
     Select n_origins halos with smallest |delta_col| (closest to zero).
