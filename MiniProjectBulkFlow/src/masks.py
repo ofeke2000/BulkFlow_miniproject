@@ -13,12 +13,19 @@ The goal is to reproduce the observational selection function in the simulation.
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
+from MDAnalysis.lib.pkdtree import PeriodicKDTree
+
+##################################################################
+# Broken functions
+##################################################################
 
 
 def make_cf4_mask(halos_df: pd.DataFrame,
                        cf4_df: pd.DataFrame,
                        radius: float = 1.0,
-                       max_doublings: int = 4) -> pd.DataFrame:
+                       max_doublings: int = 4,
+                       tree: PeriodicKDTree, 
+                       box_size: float = 1000.0) -> pd.DataFrame:
     """
     Create a one-to-one CF4-like halo sample from the simulation.
 
@@ -43,8 +50,6 @@ def make_cf4_mask(halos_df: pd.DataFrame,
         Subset of halos matched one-to-one to CF4 groups.
         Columns: ['rockstarid', 'x', 'y', 'z', 'cf4_id', 'match_distance']
     """
-    print(f"Building KDTree for {len(halos_df):,} halos...")
-    tree = cKDTree(halos_df[['x', 'y', 'z']].values)
 
     matched_rows = []
     used_indices = set()
@@ -91,75 +96,126 @@ def make_cf4_mask(halos_df: pd.DataFrame,
     print(f"Matched {len(matched_halos):,} CF4 groups to halos.")
     return matched_halos
 
-
-def make_uniform_mask(halos_df: pd.DataFrame,
-                      cf4_like_mask: pd.DataFrame,
-                      seed: int = 42) -> pd.DataFrame:
+def make_cf4_mask_pbc(halos_df: pd.DataFrame,
+                      cf4_df: pd.DataFrame,
+                      box_size: float,
+                      tree: PeriodicKDTree,
+                      radius: float = 1.0,
+                      max_doublings: int = 4) -> pd.DataFrame:
     """
-    Create a uniform random halo sample with the same count as the CF4-like mask.
+    Create a one-to-one CF4-like halo sample from the simulation using a PeriodicKDTree.
+
+    For each CF4 group, find the nearest halo within `radius` (h^-1 Mpc) using periodic boundaries.
+    If none are found, double the radius (up to `max_doublings` times) until a match is made.
 
     Parameters
     ----------
     halos_df : pandas.DataFrame
-        Full halo catalog.
-    cf4_like_mask : pandas.DataFrame
-        The CF4-like matched sample.
-    seed : int, optional
-        Random seed for reproducibility.
+        Simulation halos (columns: 'rockstarid', 'x', 'y', 'z', 'vx', 'vy', 'vz', ...).
+    cf4_df : pandas.DataFrame
+        CF4 group catalog (columns: 'id', 'x', 'y', 'z').
+    box_size : float
+        Simulation box size (assumed cubic, h^-1 Mpc).
+    radius : float
+        Initial search radius (h^-1 Mpc).
+    max_doublings : int
+        Number of times to double the search radius if no match is found.
 
     Returns
     -------
-    uniform_mask : pandas.DataFrame
-        Randomly chosen halos (same length as cf4_like_mask).
+    matched_halos : pd.DataFrame
+        Subset of halos matched one-to-one to CF4 groups.
     """
-    np.random.seed(seed)
-    n = len(cf4_like_mask)
-    print(f"Selecting {n:,} random halos for uniform mask...")
 
-    sample = halos_df.sample(n=n, random_state=seed)
-    sample = sample[['rockstarid', 'x', 'y', 'z']].copy()
-    sample['mask_type'] = 'uniform'
+    matched_rows = []
+    used_indices = set()
 
-    print(f"Created uniform mask with {len(sample):,} halos.")
-    return sample
+    print(f"Starting CF4-like matching with initial radius = {radius} h^-1 Mpc...")
 
-def pick_uniform_halos(position, radius, df_source, df_target, tree=None):
+    for i, (cf4_id, pos_cf4) in enumerate(zip(cf4_df['id'], cf4_df[['x', 'y', 'z']].values)):
+        search_radius = radius
+        neighbor_indices = []
+
+        for attempt in range(max_doublings + 1):
+            neighbor_indices = tree.search(pos_cf4, search_radius)
+            neighbor_indices = [j for j in neighbor_indices if j not in used_indices]  # avoid duplicates
+            if neighbor_indices:
+                break
+            search_radius *= 2.0
+
+        if not neighbor_indices:
+            # no match found even after doublings
+            continue
+
+        # choose the closest halo
+        halo_positions = halos_df.iloc[neighbor_indices][['x', 'y', 'z']].values
+        distances = np.linalg.norm(halo_positions - pos_cf4, axis=1)
+        j_closest = neighbor_indices[np.argmin(distances)]
+        used_indices.add(j_closest)
+
+        halo = halos_df.iloc[j_closest]
+        matched_rows.append({
+            'rockstarid': halo['rockstarid'],
+            'x': halo['x'],
+            'y': halo['y'],
+            'z': halo['z'],
+            'vx': halo['vx'],
+            'vy': halo['vy'],
+            'vz': halo['vz'],
+            'cf4_id': cf4_id,
+            'match_distance': np.min(distances)
+        })
+
+        if (i + 1) % 1000 == 0:
+            print(f"  Matched {i+1:,}/{len(cf4_df):,} CF4 groups")
+
+    matched_halos = pd.DataFrame(matched_rows)
+    print(f"Matched {len(matched_halos):,} CF4 groups to halos.")
+    return matched_halos
+
+def make_uniform_mask(
+    position: np.ndarray,
+    radius: float,
+    df_halos: pd.DataFrame,
+    CF4_catalogue: pd.DataFrame,
+    tree: PeriodicKDTree
+) -> pd.DataFrame:
     """
-    Efficiently pick halos uniformly within radius around a position.
+    Select a uniform random set of halos within a sphere of given radius
+    around a center point. The number of halos returned matches len(df_reference).
+
+    Uses MDAnalysis.lib.pkdtree.PeriodicKDTree for fast PBC search.
 
     Parameters
     ----------
     position : array-like, shape (3,)
-        The (x, y, z) coordinates of the center.
+        (x,y,z) center in h^-1 Mpc.
     radius : float
-        Radius of the selection region.
-    df_source : pd.DataFrame
-        Source halos with columns ['x', 'y', 'z'].
-    df_target : pd.DataFrame
-        Target DataFrame whose length determines number of halos to pick.
-    tree : scipy.spatial.cKDTree, optional
-        Precomputed KDTree of df_source[['x', 'y', 'z']]. If not provided, one will be built (slower).
+        Radius of sphere selection.
+    df_halos : DataFrame
+        Simulation halo catalog (with x,y,z and other columns).
+    CF4_catalogue : DataFrame
+        Reference catalog used only to set the number of halos.
+    tree : PeriodicKDTree
+        Pre-built periodic KDTree for df_halos.
 
     Returns
     -------
-    pd.DataFrame
-        Subset of df_source containing the sampled halos.
+    DataFrame
+        A subset of df_halos with full halo properties.
     """
-    # Build tree if not provided
-    if tree is None:
-        coords = df_source[['x', 'y', 'z']].to_numpy()
-        tree = cKDTree(coords)
 
-    # Query indices of points within radius
-    idx = tree.query_ball_point(position, radius)
-    if not idx:
-        raise ValueError(f"No halos found within radius {radius:.2f}")
+    # Query using periodic boundary conditions
+    neighbor_indices = tree.search(position, radius)
 
-    candidates = df_source.iloc[idx]
+    # candidate halos: FULL rows, not just coordinates
+    df_candidates = df_halos.iloc[neighbor_indices]
 
-    n_target = len(df_target)
-    replace = len(candidates) < n_target
+    n_pick = len(CF4_catalogue)
 
-    sampled = candidates.sample(n=n_target, replace=replace, random_state=np.random.default_rng())
+    # Sample with replacement if not enough halos
+    replace = len(df_candidates) < n_pick
 
-    return sampled.reset_index(drop=True)
+    selected = df_candidates.sample(n=n_pick, replace=replace)
+
+    return selected.reset_index(drop=True)
