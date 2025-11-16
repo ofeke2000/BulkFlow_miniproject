@@ -42,7 +42,7 @@ creates a new data frame which is masked, either with the CF4 data or uniformly.
 
 ### bulkflow (py)
 
-Functions that calculates the bulk flow of galaxies around a given dot in a given radii from a given data frame (could be masked if needed),
+Functions that calculates the bulk flow of galaxies around a given dot in a given radii from a given data frame (could be masked if needed)
 
 ### visualize
 

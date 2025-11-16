@@ -122,3 +122,44 @@ def make_uniform_mask(halos_df: pd.DataFrame,
 
     print(f"Created uniform mask with {len(sample):,} halos.")
     return sample
+
+def pick_uniform_halos(position, radius, df_source, df_target, tree=None):
+    """
+    Efficiently pick halos uniformly within radius around a position.
+
+    Parameters
+    ----------
+    position : array-like, shape (3,)
+        The (x, y, z) coordinates of the center.
+    radius : float
+        Radius of the selection region.
+    df_source : pd.DataFrame
+        Source halos with columns ['x', 'y', 'z'].
+    df_target : pd.DataFrame
+        Target DataFrame whose length determines number of halos to pick.
+    tree : scipy.spatial.cKDTree, optional
+        Precomputed KDTree of df_source[['x', 'y', 'z']]. If not provided, one will be built (slower).
+
+    Returns
+    -------
+    pd.DataFrame
+        Subset of df_source containing the sampled halos.
+    """
+    # Build tree if not provided
+    if tree is None:
+        coords = df_source[['x', 'y', 'z']].to_numpy()
+        tree = cKDTree(coords)
+
+    # Query indices of points within radius
+    idx = tree.query_ball_point(position, radius)
+    if not idx:
+        raise ValueError(f"No halos found within radius {radius:.2f}")
+
+    candidates = df_source.iloc[idx]
+
+    n_target = len(df_target)
+    replace = len(candidates) < n_target
+
+    sampled = candidates.sample(n=n_target, replace=replace, random_state=np.random.default_rng())
+
+    return sampled.reset_index(drop=True)
