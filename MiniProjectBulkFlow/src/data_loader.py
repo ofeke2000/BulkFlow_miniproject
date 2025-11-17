@@ -34,7 +34,7 @@ def load_rockstar_catalog(path: str, columns=None) -> pd.DataFrame:
     return df
 
 
-def load_cf4_catalogue(path: str) -> pd.DataFrame:
+def load_cf4_catalogue(path: str, h: float = 0.7) -> pd.DataFrame:
     """
     Load the CosmicFlows-4 (CF4) groups catalogue.
 

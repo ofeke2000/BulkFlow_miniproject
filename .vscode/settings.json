@@ -1,4 +1,10 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "vscode-pokemon.theme": "beach",
+    "vscode-pets.theme": "winter",
+    "vscode-pets.petSize": "small",
+    "vscode-pokemon.pokemonSize": "medium",
+    "vscode-pets.throwBallWithMouse": false,
+    "vscode-pets.position": "explorer"
 }
