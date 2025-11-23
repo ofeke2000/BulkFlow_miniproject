@@ -143,6 +143,9 @@ def ml_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tup
     U = covU @ b
     return U, covU
 
+##########################################################################
+# Bulk flow series (Not Good)
+##########################################################################
 
 def compute_bulkflow_series(halos_df: pd.DataFrame,
                             origin: Tuple[float, float, float],
