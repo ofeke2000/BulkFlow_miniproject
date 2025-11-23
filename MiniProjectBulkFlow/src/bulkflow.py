@@ -15,9 +15,6 @@ Functions
                           min_count=10, cumulative=True)
     compute bulk flow (and uncertainties) for a series of radii (cumulative by default)
 
-- save_bulkflow_results(df_results, outpath)
-    convenience writer for results DataFrame
-
 Notes / assumptions
 -------------------
 * The module assumes halo velocities (vx, vy, vz) are in the same units as you want the
@@ -235,19 +232,3 @@ def compute_bulkflow_series(halos_df: pd.DataFrame,
 
     results_df = pd.DataFrame(results)
     return results_df
-
-
-def save_bulkflow_results(df_results: pd.DataFrame, outpath: str) -> None:
-    """
-    Save results DataFrame to CSV.
-
-    Parameters
-    ----------
-    df_results : pandas.DataFrame
-        Results DataFrame returned by compute_bulkflow_series.
-    outpath : str
-        Output CSV path; directories are created if missing.
-    """
-    os.makedirs(os.path.dirname(os.path.abspath(outpath)), exist_ok=True)
-    df_results.to_csv(outpath, index=False)
-    logging.info(f"Saved bulk flow results to {outpath}")
