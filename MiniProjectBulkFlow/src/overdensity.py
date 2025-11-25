@@ -15,15 +15,20 @@ The result can be used to identify halos in 'average' environments (|delta_R| â‰
 
 import numpy as np
 import pandas as pd
+import sys
 from MDAnalysis.lib.pkdtree import PeriodicKDTree
+
+#################################################################
+# compute_overdensity
+################################################################
 
 
 def compute_overdensity(
     df: pd.DataFrame,
     radius: float = 5.0,
+    tree: PeriodicKDTree | None = None,
     box_size: float = 1000.0,
-    mass_column: str = "mvir",
-    tree: PeriodicKDTree | None = None
+    mass_column: str = "mvir"
 ) -> pd.DataFrame:
     """
     Compute the local overdensity delta_R for each halo using a periodic KDTree.
@@ -34,12 +39,12 @@ def compute_overdensity(
         Halo catalog containing 'x', 'y', 'z', and mass column.
     radius : float
         Sphere radius in h^-1 Mpc.
+    tree : PeriodicKDTree
+        Pre-built tree (optional). 
     box_size : float
         Size of the simulation box in h^-1 Mpc.
     mass_column : str
         Column representing halo mass (default 'mvir').
-    tree : PeriodicKDTree
-        Pre-built tree (optional). If None, tree is constructed.
 
     Returns
     -------
@@ -56,11 +61,7 @@ def compute_overdensity(
 
     # --- Build tree if not provided ---
     if tree is None:
-        print(f"Building PeriodicKDTree for {len(df):,} halos...")
-        coords = df[['x', 'y', 'z']].values.astype(np.float64)
-        tree = PeriodicKDTree(coords, box=box_size)
-    else:
-        print("Using pre-built PeriodicKDTree")
+        sys.exit("No tree proveded. Please provide a pre-built PeriodicKDTree.")
 
     # --- Mean mass density ---
     box_volume = box_size**3
@@ -87,7 +88,7 @@ def compute_overdensity(
 
         overdensity[i] = (rho_local - rho_mean) / rho_mean
 
-        if i % 20000 == 0 and i > 0:
+        if i  == len(df)/2 and i > 0:
             print(f"  Processed {i:,} halos...")
 
     print("Done computing overdensity.")
