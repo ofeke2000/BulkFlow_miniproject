@@ -37,6 +37,10 @@ import os
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
+###########################################################################
+# Should move to specific_utils.py?
+###########################################################################
+
 
 def radial_velocity_and_error(halos: pd.DataFrame,
                               origin: Tuple[float, float, float],
@@ -77,6 +81,10 @@ def radial_velocity_and_error(halos: pd.DataFrame,
     disp = pos - np.array(origin, dtype=float).reshape((1, 3))
     r_norm = np.linalg.norm(disp, axis=1)
 
+    ###########################################################
+    # Need to check what to do for objects exactly at origin
+    ###########################################################
+
     # handle objects exactly at origin (avoid divide-by-zero)
     zero_mask = (r_norm == 0.0)
     if np.any(zero_mask):
@@ -96,7 +104,7 @@ def radial_velocity_and_error(halos: pd.DataFrame,
     return v_rad, r_hat, sigma
 
 
-def ml_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def MLE_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Maximum-likelihood bulk flow estimator for a single sample.
 
