@@ -42,64 +42,132 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 # Compute A^-1 for multiple radii
 ###########################################################################
 
-def compute_Ainv_shells(r_hat: np.ndarray, sigma: np.ndarray, r: np.ndarray, r_Min: float, r_Max: float, r_jumps: Iterable[float]):
+import numpy as np
+
+def compute_Ainv(r_hat: np.ndarray, sigma: np.ndarray, r_sorted: np.ndarray, r_jumps: Iterable[float]) -> dict:
     """
-    Compute A^{-1}(R) for multiple spherical radii using the MLE bulk-flow method.
+    Compute A^{-1}(R) incrementally assuming halos are sorted by radius.
 
     Parameters
     ----------
-    v_rad : array, shape (N,)
-        Radial velocities (not used inside A, but included for consistency).
-    r_hat : array, shape (N, 3)
-        Unit direction vectors for each object.
-    sigma : array, shape (N,)
-        Velocity uncertainties for each object.
-    r : array, shape (N,)
-        3D distances of objects from the observer.
-    r_Min : float
-        Minimum radius to include objects.
-    r_Max : float
-        Maximum radius to include objects.
-    r_jumps : list / array
-        A list of radii at which A^{-1} is computed (e.g. [5, 10, 15, 20]).
+    r_hat      : array (N, 3)
+        Unit vectors.
+    sigma      : array (N,)
+        Velocity uncertainties.
+    r_sorted   : array (N,)
+        Radii of halos, sorted in increasing order.
+    r_jumps    : list/array
+        Radii at which A^{-1}(R) is saved (sorted ascending).
 
     Returns
     -------
-    Ainv_dict : dict
-        Dictionary mapping radius R → inverse matrix A^{-1}(R)
-        e.g., {5: Ainv_5, 10: Ainv_10, 15: Ainv_15}
+    dict : {R : Ainv_R}
     """
 
-    # Precompute weights
-    w = 1.0 / sigma**2
+    small_scale_velocities = 250.0  # km/s
+    Sigma_Star = small_scale_velocities * np.ones(len(sigma), dtype=float)
+    # Weight = 1 / sigma^2
+    W = 1.0 / (sigma**2 + Sigma_Star**2)
+
+    # Running A matrix (3x3)
+    A = np.zeros((3, 3), dtype=float)
 
     Ainv_dict = {}
+    jump_index = 0
+    current_jump = r_jumps[jump_index]
 
-    for R in r_jumps:
-        # Select objects inside the spherical shell
-        mask = (r >= r_Min) & (r <= min(R, r_Max))
-        if np.sum(mask) < 5:
-            # Not enough objects to invert 3×3 matrix
-            Ainv_dict[R] = np.full((3, 3), np.nan)
-            continue
+    for i in range(len(r_sorted)):
 
-        r_hat_sel = r_hat[mask]
-        w_sel = w[mask]
+        # If we crossed a jump radius, compute and save A^{-1}
+        while jump_index < len(r_jumps) and r_sorted[i] >= current_jump:
 
-        # Build A = Σ (w_i * r_hat_i ⊗ r_hat_i)
-        A = np.zeros((3, 3))
-        for i in range(len(r_hat_sel)):
-            A += w_sel[i] * np.outer(r_hat_sel[i], r_hat_sel[i])
+            # Try to invert the matrix
+            try:
+                Ainv_dict[current_jump] = np.linalg.inv(A.copy())
+            except np.linalg.LinAlgError:
+                Ainv_dict[current_jump] = np.full((3, 3), np.nan)
 
-        # Attempt to invert A
-        try:
-            Ainv = np.linalg.inv(A)
-        except np.linalg.LinAlgError:
-            Ainv = np.full((3, 3), np.nan)
+            jump_index += 1
+            if jump_index < len(r_jumps):
+                current_jump = r_jumps[jump_index]
+            else:
+                break
 
-        Ainv_dict[R] = Ainv
+        # Add this halo to A
+        A += W[i] * np.outer(r_hat[i], r_hat[i])    
+
+        if jump_index >= len(r_jumps):
+            break
 
     return Ainv_dict
+
+
+##########################################################################
+# Compute u_i(R) for multiple radii
+##########################################################################
+
+def compute_u_i(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray, r_sorted: np.ndarray, r_jumps: Iterable[float], Ainv_dict: dict) -> dict:
+    """
+    Incrementally compute b(R) for multiple radii, assuming r_sorted is ascending.
+
+    Parameters
+    ----------
+    v_rad    : (N,)
+        Radial velocities.
+    r_hat    : (N, 3)
+        Unit direction vectors.
+    sigma    : (N,)
+        Velocity uncertainties.
+    r_sorted : (N,)
+        Radii of objects, sorted ascending.
+    r_jumps  : list/array
+        Radii at which to save b(R).
+
+    Returns
+    -------
+    dict : {R : b_R}   where b_R is a 3-vector.
+    """
+    small_scale_velocities = 250.0  # km/s
+    Sigma_Star = small_scale_velocities * np.ones(len(sigma), dtype=float)
+    # Weight = 1 / sigma^2
+    w = 1.0 / (sigma**2 + Sigma_Star**2)
+    b = np.zeros(3, dtype=float)  # running b-vector
+
+    b_dict = {}
+    jump_index = 0
+    current_jump = r_jumps[jump_index]
+
+    for i in range(len(r_sorted)):
+
+        # BEFORE adding halo i → check if we crossed the next radius
+        while jump_index < len(r_jumps) and r_sorted[i] > current_jump:
+
+            # Save b(R) *before* adding halo i
+            b_dict[current_jump] = b.copy()
+
+            jump_index += 1
+            if jump_index < len(r_jumps):
+                current_jump = r_jumps[jump_index]
+            else:
+                return b_dict
+
+        # Now safe to add halo i into b
+        b += w[i] * v_rad[i] * r_hat[i]
+
+    # Handle remaining radii beyond max r
+    while jump_index < len(r_jumps):
+        b_dict[current_jump] = b.copy()
+        jump_index += 1
+        if jump_index < len(r_jumps):
+            current_jump = r_jumps[jump_index]
+
+    return b_dict
+
+
+##########################################################################
+# Maximum-likelihood bulk flow estimator
+##########################################################################
+
 
 def MLE_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
