@@ -34,75 +34,72 @@ import numpy as np
 import pandas as pd
 import logging
 import os
+from specific_utils import radial_velocity_and_error
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 ###########################################################################
-# Should move to specific_utils.py?
+# Compute A^-1 for multiple radii
 ###########################################################################
 
-
-def radial_velocity_and_error(halos: pd.DataFrame,
-                              origin: Tuple[float, float, float],
-                              error_frac: float = 0.20,
-                              min_sigma: float = 50.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def compute_Ainv_shells(r_hat: np.ndarray, sigma: np.ndarray, r: np.ndarray, r_Min: float, r_Max: float, r_jumps: Iterable[float]):
     """
-    Compute line-of-sight unit vectors r_hat, radial velocities v_rad, and per-object errors sigma.
+    Compute A^{-1}(R) for multiple spherical radii using the MLE bulk-flow method.
 
     Parameters
     ----------
-    halos : pd.DataFrame
-        halo dataframe with columns ['x','y','z','vx','vy','vz'] (positions in h^-1 Mpc,
-        velocities in km/s or same units as desired).
-    origin : 3-tuple of floats
-        (x0, y0, z0) observer / origin coordinates in the same units as halo positions.
-    error_frac : float
-        Fractional error to apply to radial velocities (default 0.20 for 20%).
-        sigma_i = max(error_frac * |v_rad_i|, min_sigma).
-    min_sigma : float
-        Minimum per-object error to avoid zero uncertainties (in same units as velocity).
+    v_rad : array, shape (N,)
+        Radial velocities (not used inside A, but included for consistency).
+    r_hat : array, shape (N, 3)
+        Unit direction vectors for each object.
+    sigma : array, shape (N,)
+        Velocity uncertainties for each object.
+    r : array, shape (N,)
+        3D distances of objects from the observer.
+    r_Min : float
+        Minimum radius to include objects.
+    r_Max : float
+        Maximum radius to include objects.
+    r_jumps : list / array
+        A list of radii at which A^{-1} is computed (e.g. [5, 10, 15, 20]).
 
     Returns
     -------
-    v_rad : (N,) ndarray
-        radial velocities (v · r_hat)
-    r_hat : (N,3) ndarray
-        unit vectors from origin to halo
-    sigma : (N,) ndarray
-        per-halo uncertainties
+    Ainv_dict : dict
+        Dictionary mapping radius R → inverse matrix A^{-1}(R)
+        e.g., {5: Ainv_5, 10: Ainv_10, 15: Ainv_15}
     """
-    if not all(col in halos.columns for col in ('x', 'y', 'z', 'vx', 'vy', 'vz')):
-        raise ValueError("halos must contain columns: 'x','y','z','vx','vy','vz'")
 
-    pos = halos[['x', 'y', 'z']].values.astype(float)
-    vel = halos[['vx', 'vy', 'vz']].values.astype(float)
+    # Precompute weights
+    w = 1.0 / sigma**2
 
-    # displacement vector from origin to object
-    disp = pos - np.array(origin, dtype=float).reshape((1, 3))
-    r_norm = np.linalg.norm(disp, axis=1)
+    Ainv_dict = {}
 
-    ###########################################################
-    # Need to check what to do for objects exactly at origin
-    ###########################################################
+    for R in r_jumps:
+        # Select objects inside the spherical shell
+        mask = (r >= r_Min) & (r <= min(R, r_Max))
+        if np.sum(mask) < 5:
+            # Not enough objects to invert 3×3 matrix
+            Ainv_dict[R] = np.full((3, 3), np.nan)
+            continue
 
-    # handle objects exactly at origin (avoid divide-by-zero)
-    zero_mask = (r_norm == 0.0)
-    if np.any(zero_mask):
-        logging.warning("Found {0} halos exactly at the origin. Setting tiny offset to avoid singular rhat."
-                        .format(zero_mask.sum()))
-        r_norm[zero_mask] = 1e-8
-        disp[zero_mask] += 1e-8
+        r_hat_sel = r_hat[mask]
+        w_sel = w[mask]
 
-    r_hat = disp / r_norm[:, None]  # shape (N,3)
+        # Build A = Σ (w_i * r_hat_i ⊗ r_hat_i)
+        A = np.zeros((3, 3))
+        for i in range(len(r_hat_sel)):
+            A += w_sel[i] * np.outer(r_hat_sel[i], r_hat_sel[i])
 
-    # radial velocity: projection of velocity onto line-of-sight unit vector
-    v_rad = np.sum(vel * r_hat, axis=1)
+        # Attempt to invert A
+        try:
+            Ainv = np.linalg.inv(A)
+        except np.linalg.LinAlgError:
+            Ainv = np.full((3, 3), np.nan)
 
-    # simple fractional error model (user-specified)
-    sigma = np.maximum(np.abs(error_frac * v_rad), min_sigma)
+        Ainv_dict[R] = Ainv
 
-    return v_rad, r_hat, sigma
-
+    return Ainv_dict
 
 def MLE_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -127,9 +124,9 @@ def MLE_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tu
     if len(v_rad) != len(r_hat) or len(v_rad) != len(sigma):
         raise ValueError("v_rad, r_hat and sigma must have matching lengths")
 
-    # Build A and b
+    # Build A and w
     A = np.zeros((3, 3), dtype=float)
-    b = np.zeros(3, dtype=float)
+    w = np.zeros(3, dtype=float)
 
     inv_sigma2 = 1.0 / (sigma ** 2)
 
@@ -137,7 +134,7 @@ def MLE_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tu
     for i in range(len(v_rad)):
         ri = r_hat[i].reshape(3, 1)  # column
         A += inv_sigma2[i] * (ri @ ri.T)
-        b += inv_sigma2[i] * v_rad[i] * r_hat[i]
+        w += inv_sigma2[i] * v_rad[i] * r_hat[i]
 
     # solve
     # Regularize if A is nearly singular (tiny Tikhonov)
@@ -148,7 +145,7 @@ def MLE_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tu
         reg = np.eye(3) * 1e-8 * np.mean(np.diag(A))
         covU = np.linalg.inv(A + reg)
 
-    U = covU @ b
+    U = covU @ w
     return U, covU
 
 ##########################################################################
