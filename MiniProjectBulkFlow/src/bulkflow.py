@@ -44,7 +44,10 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 import numpy as np
 
-def compute_Ainv(r_hat: np.ndarray, sigma: np.ndarray, r_sorted: np.ndarray, r_jumps: Iterable[float]) -> dict:
+def compute_Ainv(r_hat: np.ndarray, 
+                 sigma: np.ndarray, 
+                 r_sorted: np.ndarray, 
+                 r_jumps: Iterable[float]) -> dict:
     """
     Compute A^{-1}(R) incrementally assuming halos are sorted by radius.
 
@@ -103,65 +106,53 @@ def compute_Ainv(r_hat: np.ndarray, sigma: np.ndarray, r_sorted: np.ndarray, r_j
 
 
 ##########################################################################
-# Compute u_i(R) for multiple radii
+# Compute w_i(R) for multiple radii
 ##########################################################################
 
-def compute_u_i(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray, r_sorted: np.ndarray, r_jumps: Iterable[float], Ainv_dict: dict) -> dict:
+def compute_w_mle(
+    r_hat: np.ndarray,
+    sigma: np.ndarray,
+    Ainv_dict: dict,
+    sigma_star: float = 250.0
+):
     """
-    Incrementally compute b(R) for multiple radii, assuming r_sorted is ascending.
+    Compute the MLE weights w_{i,n} for all radii in Ainv_dict.
 
     Parameters
     ----------
-    v_rad    : (N,)
-        Radial velocities.
-    r_hat    : (N, 3)
-        Unit direction vectors.
-    sigma    : (N,)
-        Velocity uncertainties.
-    r_sorted : (N,)
-        Radii of objects, sorted ascending.
-    r_jumps  : list/array
-        Radii at which to save b(R).
+    r_hat : (N, 3)
+        Unit vectors for each halo.
+    sigma : (N,)
+        Measurement uncertainties for each halo.
+    Ainv_dict : dict
+        Dictionary mapping radius R -> A^{-1}(R)  (3x3 matrices).
+    sigma_star : float
+        Nonlinear dispersion term σ* (default 250 km/s).
 
     Returns
     -------
-    dict : {R : b_R}   where b_R is a 3-vector.
+    dict : {R : w_R}
+        w_R is an array of shape (N, 3), with w_R[n,i] = w_{i,n}.
     """
-    small_scale_velocities = 250.0  # km/s
-    Sigma_Star = small_scale_velocities * np.ones(len(sigma), dtype=float)
-    # Weight = 1 / sigma^2
-    w = 1.0 / (sigma**2 + Sigma_Star**2)
-    b = np.zeros(3, dtype=float)  # running b-vector
 
-    b_dict = {}
-    jump_index = 0
-    current_jump = r_jumps[jump_index]
+    N = len(sigma)
+    denom = sigma**2 + sigma_star**2  # denominator for all halos
+    s = 1.0 / denom                   # (N,)
 
-    for i in range(len(r_sorted)):
+    w_dict = {}
 
-        # BEFORE adding halo i → check if we crossed the next radius
-        while jump_index < len(r_jumps) and r_sorted[i] > current_jump:
+    for R, Ainv in Ainv_dict.items():
 
-            # Save b(R) *before* adding halo i
-            b_dict[current_jump] = b.copy()
+        # (N,3) * (3,3) → (N,3)
+        # Each halo row gets multiplied by A^{-1}
+        projected = r_hat @ Ainv.T   # shape: (N, 3)
 
-            jump_index += 1
-            if jump_index < len(r_jumps):
-                current_jump = r_jumps[jump_index]
-            else:
-                return b_dict
+        # Multiply each row by s[n]
+        w = projected * s[:, None]   # broadcast (N,1)
 
-        # Now safe to add halo i into b
-        b += w[i] * v_rad[i] * r_hat[i]
+        w_dict[R] = w
 
-    # Handle remaining radii beyond max r
-    while jump_index < len(r_jumps):
-        b_dict[current_jump] = b.copy()
-        jump_index += 1
-        if jump_index < len(r_jumps):
-            current_jump = r_jumps[jump_index]
-
-    return b_dict
+    return w_dict
 
 
 ##########################################################################
