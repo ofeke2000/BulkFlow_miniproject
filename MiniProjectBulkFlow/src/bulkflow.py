@@ -106,106 +106,145 @@ def compute_Ainv(r_hat: np.ndarray,
 
 
 ##########################################################################
-# Compute w_i(R) for multiple radii
+# Compute u_i(R) for multiple radii
 ##########################################################################
 
-def compute_w_mle(
+def compute_bulk_flow_MLE_single_radius(
     r_hat: np.ndarray,
+    r_sorted: np.ndarray,
+    radius: float,
+    v_rad: np.ndarray,
     sigma: np.ndarray,
-    Ainv_dict: dict,
-    sigma_star: float = 250.0
+    Ainv: np.ndarray,
+    sigma_star: float = 250.0,
 ):
     """
-    Compute the MLE weights w_{i,n} for all radii in Ainv_dict.
+    Compute the MLE bulk flow vector u(R) for a single radius,
+    using only halos inside the radius.
 
     Parameters
     ----------
     r_hat : (N, 3)
         Unit vectors for each halo.
+    r_sorted : (N,)
+        Radii of halos (must be sorted ascending).
+    radius : float
+        Radius R at which to compute the bulk flow.
+    v_rad : (N,)
+        Radial peculiar velocities.
     sigma : (N,)
-        Measurement uncertainties for each halo.
-    Ainv_dict : dict
-        Dictionary mapping radius R -> A^{-1}(R)  (3x3 matrices).
+        Measurement uncertainties.
+    Ainv : (3,3)
+        Inverse A matrix for this radius.
     sigma_star : float
-        Nonlinear dispersion term σ* (default 250 km/s).
+        Nonlinear dispersion parameter (default 250 km/s).
 
     Returns
     -------
-    dict : {R : w_R}
-        w_R is an array of shape (N, 3), with w_R[n,i] = w_{i,n}.
+    dict : {radius : u_R}
+        u_R is a numpy array of shape (3,) with [u_x, u_y, u_z].
     """
 
-    N = len(sigma)
-    denom = sigma**2 + sigma_star**2  # denominator for all halos
-    s = 1.0 / denom                   # (N,)
+    # ---- Filter halos within R ----
+    mask = r_sorted <= radius
 
-    w_dict = {}
+    r_hat_R   = r_hat[mask]
+    v_rad_R   = v_rad[mask]
+    sigma_R   = sigma[mask]
 
-    for R, Ainv in Ainv_dict.items():
+    # ---- MLE Weights ----
+    denom = sigma_R**2 + sigma_star**2
+    s = 1.0 / denom   # shape (N_R,)
 
-        # (N,3) * (3,3) → (N,3)
-        # Each halo row gets multiplied by A^{-1}
-        projected = r_hat @ Ainv.T   # shape: (N, 3)
+    # (N_R, 3) @ (3,3) → (N_R, 3)
+    projected = r_hat_R @ Ainv.T
 
-        # Multiply each row by s[n]
-        w = projected * s[:, None]   # broadcast (N,1)
+    # Multiply rows by s[n]
+    w = projected * s[:, None]
 
-        w_dict[R] = w
+    # Multiply by radial velocities
+    weighted_v = w * v_rad_R[:, None]
 
-    return w_dict
+    # ---- Bulk flow: sum over all halos ----
+    u_R = np.sum(weighted_v, axis=0)
 
+    return {radius: u_R}
 
 ##########################################################################
-# Maximum-likelihood bulk flow estimator
+# Compute u_i(R) for multiple radii
 ##########################################################################
 
-
-def MLE_bulk_flow(v_rad: np.ndarray, r_hat: np.ndarray, sigma: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def compute_bulk_flow_table(
+    r_hat: np.ndarray,
+    r_sorted: np.ndarray,
+    r_jumps: np.ndarray,
+    v_rad: np.ndarray,
+    sigma: np.ndarray,
+    Ainv_dict: dict,
+    sigma_star: float = 250.0
+):
     """
-    Maximum-likelihood bulk flow estimator for a single sample.
+    Compute bulk flow (MLE) at multiple radii and return a DataFrame.
 
     Parameters
     ----------
-    v_rad : (N,) array
-        radial velocities
-    r_hat : (N,3) array
-        line-of-sight unit vectors
-    sigma : (N,) array
-        per-object uncertainties
+    r_hat : (N,3)
+        Unit vectors for halos.
+    r_sorted : (N,)
+        Radii of halos (sorted ascending).
+    r_jumps : array-like
+        Radii at which to compute the bulk flow.
+    v_rad : (N,)
+        Radial velocities.
+    sigma : (N,)
+        Measurement uncertainties.
+    Ainv_dict : dict
+        Mapping radius -> 3x3 A^{-1}(R) matrix.
+    sigma_star : float
+        Nonlinear dispersion term σ*.
 
     Returns
     -------
-    U : (3,) array
-        estimated bulk flow vector (Ux,Uy,Uz)
-    covU : (3,3) array
-        covariance matrix of U
+    DataFrame
+        Columns: [radius, u_x, u_y, u_z, U_total]
     """
-    if len(v_rad) != len(r_hat) or len(v_rad) != len(sigma):
-        raise ValueError("v_rad, r_hat and sigma must have matching lengths")
 
-    # Build A and w
-    A = np.zeros((3, 3), dtype=float)
-    w = np.zeros(3, dtype=float)
+    results = {
+        "radius": [],
+        "u_x": [],
+        "u_y": [],
+        "u_z": [],
+        "U_total": []
+    }
 
-    inv_sigma2 = 1.0 / (sigma ** 2)
+    for R in r_jumps:
 
-    # accumulate
-    for i in range(len(v_rad)):
-        ri = r_hat[i].reshape(3, 1)  # column
-        A += inv_sigma2[i] * (ri @ ri.T)
-        w += inv_sigma2[i] * v_rad[i] * r_hat[i]
+        Ainv = Ainv_dict[R]   # 3×3 inverse A at this radius
 
-    # solve
-    # Regularize if A is nearly singular (tiny Tikhonov)
-    try:
-        covU = np.linalg.inv(A)
-    except np.linalg.LinAlgError:
-        logging.warning("A matrix singular or ill-conditioned: adding small regularization.")
-        reg = np.eye(3) * 1e-8 * np.mean(np.diag(A))
-        covU = np.linalg.inv(A + reg)
+        # --- compute bulk flow for R ---
+        u_R = compute_bulk_flow_single_radius(
+            r_hat=r_hat,
+            r_sorted=r_sorted,
+            radius=R,
+            v_rad=v_rad,
+            sigma=sigma,
+            Ainv=Ainv,
+            sigma_star=sigma_star,
+        )[R]
 
-    U = covU @ w
-    return U, covU
+        ux, uy, uz = u_R
+        Utot = np.sqrt(ux**2 + uy**2 + uz**2)
+
+        results["radius"].append(R)
+        results["u_x"].append(ux)
+        results["u_y"].append(uy)
+        results["u_z"].append(uz)
+        results["U_total"].append(Utot)
+
+    # convert to DataFrame
+    df = pd.DataFrame(results)
+    return df
+
 
 ##########################################################################
 # Bulk flow series (Not Good)
