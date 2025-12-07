@@ -12,7 +12,6 @@ The goal is to reproduce the observational selection function in the simulation.
 
 import numpy as np
 import pandas as pd
-from scipy.spatial import cKDTree
 from MDAnalysis.lib.pkdtree import PeriodicKDTree
 
 ##################################################################

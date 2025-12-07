@@ -32,7 +32,7 @@ Notes / assumptions
 from typing import Iterable, Tuple
 import numpy as np
 import pandas as pd
-from specific_utils import radial_velocity_and_error_pbc
+from src.specific_utils import radial_velocity_and_error_pbc
 
 ########################################################################
 # Compute A^-1 for multiple radii

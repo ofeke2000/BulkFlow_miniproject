@@ -8,7 +8,7 @@ MDPL2:
 paths:
   rockstar_catalog: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/mdpl2_rockstar_125_pid-1_mvir12.csv"
   cf4_catalog: "~/bulk-flow-Rockstar/Data/cf4_group_catalogue/cf4_group_catalogue.csv"
-  output_dir: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series"
+  output_dir: "~/BulkFlow_miniproject/BulkFlow_miniproject/output/Quick_test_bulkflow_results.h5"
 
 columns:
   - rockstarid
@@ -22,7 +22,7 @@ columns:
 
 overdensity:
   radius: 5.0    # h^-1 Mpc
-  n_lowest_delta: 50
+  n_lowest_delta: 1
 
 bulkflow:
   max_radius: 250.0          # h^-1 Mpc
