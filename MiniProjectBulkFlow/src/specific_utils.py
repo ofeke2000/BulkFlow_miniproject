@@ -1,6 +1,7 @@
 # specific_utils.py
 import numpy as np
 import pandas as pd
+import os
 
 
 def weighted_average(values, weights):
@@ -88,3 +89,58 @@ def radial_velocity_and_error_pbc(
     halos_df['sigma_vrad'] = sigma
 
     return halos_df
+
+########################################################
+# Save bulk flow results to HDF5
+########################################################
+
+def append_bulkflow_results(
+    results_df: pd.DataFrame,
+    origin_id: int,
+    mask_name: str,
+    filename: str = "bulkflow_results.h5"
+):
+    """
+    Append bulk flow results for a single origin & mask to a tidy HDF5 database.
+
+    Parameters
+    ----------
+    results_df : pd.DataFrame
+        DataFrame with columns:
+            ["radius", "u_x", "u_y", "u_z", "U_total"]
+        All rows correspond to the same origin and mask.
+
+    origin_id : int
+        Identifier of the origin point.
+
+    mask_name : str
+        Name of the mask, e.g. "uniform" or "cf4".
+
+    filename : str, optional
+        Path to the HDF5 database.
+        Default: "bulkflow_results.h5"
+    """
+
+    # Validate input columns
+    expected_cols = {"radius", "u_x", "u_y", "u_z", "U_total"}
+    if not expected_cols.issubset(results_df.columns):
+        raise ValueError(f"Results df must contain columns: {expected_cols}")
+
+    # Build a tidy dataframe to append
+    df_to_store = results_df.copy()
+    df_to_store["origin_id"] = origin_id
+    df_to_store["mask"] = mask_name
+
+    # Reorder columns for cleanliness (optional but recommended)
+    df_to_store = df_to_store[
+        ["origin_id", "mask", "radius", "u_x", "u_y", "u_z", "U_total"]
+    ]
+
+    # Append to HDF5 database
+    df_to_store.to_hdf(
+        filename,
+        key="bulkflow",
+        format="table",     # allow append and filtering
+        mode="a",           # append mode
+        append=True
+    )

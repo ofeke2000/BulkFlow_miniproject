@@ -1,132 +1,181 @@
-# main.py
-import os
-import pandas as pd
 import yaml
-from utils import setup_logger, ensure_dir, timing
+import numpy as np
+import pandas as pd
+import logging
+from pathlib import Path
+
+from MDAnalysis.lib.pkdtree import PeriodicKDTree
+
+# --- Local modules ---
 from data_loader import load_rockstar_catalog, load_cf4_catalogue
 from overdensity import compute_overdensity
 from masks import make_cf4_mask, make_uniform_mask
-from experiment import run_bulkflow_experiment
-from visualize import (
-    scatter_overdensity,
-    projection_overdensity,
-    histogram_overdensity,
+from bulkflow import calculate_bulk_flow_series
+from specific_utils import append_bulkflow_results
+
+
+# ------------------------------------------------------
+# Setup logging
+# ------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%H:%M:%S"
 )
-from utils import save_dataframe
 
 
-# ================================================================
-# CONFIGURATION
-# ================================================================
-
-CONFIG_PATH = "config.yaml"
-
-def load_config(path):
+# ------------------------------------------------------
+# Load YAML configuration
+# ------------------------------------------------------
+def load_config(path: str = "config.yaml") -> dict:
+    logging.info(f"Loading config from {path}")
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
 
-config = load_config(CONFIG_PATH)
-
-INPUT_CSV = os.path.expanduser(config["input_csv"])
-CF4_CSV = os.path.expanduser(config["cf4_csv"])
-OUTPUT_DIR = os.path.expanduser(config["output_dir"])
-ensure_dir(OUTPUT_DIR)
-LOG_PATH = os.path.join(OUTPUT_DIR, "run.log")
-logger = setup_logger(LOG_PATH)
-
-
-# ================================================================
-# MAIN PIPELINE
-# ================================================================
-
-@timing
+# ------------------------------------------------------
+# Main workflow
+# ------------------------------------------------------
 def main():
-    logger.info("=== Bulk Flow Analysis Pipeline Started ===")
+    # ===========================================
+    # 1. Load configuration
+    # ===========================================
+    cfg = load_config("config.yaml")
 
-    # ------------------------------------------------------------
-    # 1. Load simulation halo data
-    # ------------------------------------------------------------
-    df = load_rockstar_catalog(INPUT_CSV, usecols=config["columns"])
-    cf4_df = load_cf4_catalogue(CF4_CSV)
-    logger.info(f"Loaded {len(df)} halos from Rockstar catalogue.")
+    rockstar_path = cfg["paths"]["rockstar_catalog"]
+    cf4_path = cfg["paths"]["cf4_catalog"]
+    output_file = cfg["paths"]["output_file"]
 
-    # ------------------------------------------------------------
-    # 2. Compute overdensity δ₅ and find the lowest δ₅ halos
-    # ------------------------------------------------------------
-    logger.info("Computing local overdensity δ₅ ...")
-    radius = config["overdensity"]["radius"]
-    df = compute_overdensity(df, radius=radius)
-    save_dataframe(df[["rockstarid", f"delta_{int(radius)}"]], os.path.join(OUTPUT_DIR, "delta5_table.csv"))
+    box_size = cfg["simulation"]["box_size"]
+    radius_overdensity = cfg["simulation"]["overdensity_radius"]
+    n_lowest = cfg["simulation"]["n_lowest"]
 
-    histogram_overdensity(df, OUTPUT_DIR)
-    scatter_overdensity(df, OUTPUT_DIR)
-    projection_overdensity(df, OUTPUT_DIR, plane=config["visualization"]["projection_plane"])
+    # bulkflow config
+    r_min = cfg["bulkflow"]["r_min"]
+    r_max = cfg["bulkflow"]["r_max"]
+    r_jump = cfg["bulkflow"]["r_jump"]
+    error_frac = cfg["bulkflow"]["error_fraction"]
+    sigma_star = cfg["bulkflow"]["sigma_star"]
+    sigma_min = cfg["bulkflow"]["sigma_min"]
 
-    n_lowest = config["experiment"]["n_lowest_delta"]
-    df_sorted = df.sort_values(by=f"delta_{int(radius)}", key=abs).head(n_lowest)
-    start_points = df_sorted[["x", "y", "z"]].values
-    logger.info(f"Selected {n_lowest} lowest-|δ₅| halos as starting points.")
+    logging.info("Configuration loaded successfully.")
 
-    # ------------------------------------------------------------
-    # 3. Create masks
-    # ------------------------------------------------------------
-    logger.info("Creating CF4 and uniform masks ...")
-    cf4_mask = make_cf4_mask(df, cf4_df, radius=1.0)
-    uniform_mask = make_uniform_mask(df, size=len(cf4_mask))
+    # ===========================================
+    # 2. Load catalogs
+    # ===========================================
+    logging.info("Loading Rockstar catalog...")
+    halos_df = load_rockstar_catalog(rockstar_path)
 
-    # Save mask info (optional, for reproducibility)
-    save_dataframe(cf4_mask, os.path.join(OUTPUT_DIR, "cf4_mask.csv"))
-    save_dataframe(uniform_mask, os.path.join(OUTPUT_DIR, "uniform_mask.csv")) 
+    logging.info("Loading CF4 catalog...")
+    cf4_df = load_cf4_catalogue(cf4_path)
 
-    # ------------------------------------------------------------
-    # 4. Run bulk flow experiment (ML-based) for both masks
-    # ------------------------------------------------------------
-    logger.info("Running bulk flow experiment with both masks ...")
-    radii = list(range(
-        config["experiment"]["min_radius"],
-        config["experiment"]["max_radius"] + config["experiment"]["radii_step"],
-        config["experiment"]["radii_step"]
-    ))
+    # ===========================================
+    # 3. Build PeriodicKDTree
+    # ===========================================
+    logging.info("Building PeriodicKDTree...")
+    tree = PeriodicKDTree(halos_df[["x", "y", "z"]].values, boxsize=box_size)
 
-    error_fraction=config["experiment"]["error_fraction"]
-    parallel=config["experiment"]["parallel"]
-
-    # CF4 mask
-    logger.info("Running experiment with CF4 mask...")
-    run_bulkflow_experiment(
-        df=df,
-        start_points=start_points,
-        mask=cf4_mask,
-        radii=radii,
-        error_fraction=error_fraction,
-        output_path=os.path.join(OUTPUT_DIR, "bulkflow_CF4.csv"),
-        parallel=parallel
+    # ===========================================
+    # 4. Compute overdensity
+    # ===========================================
+    logging.info("Computing overdensity...")
+    halos_df = compute_overdensity(
+        df=halos_df,
+        radius=radius_overdensity,
+        tree=tree,
+        box_size=box_size,
+        mass_column="mvir"
     )
 
-    # Uniform mask
-    logger.info("Running experiment with uniform mask...")
-    run_bulkflow_experiment(
-        df=df,
-        start_points=start_points,
-        mask=uniform_mask,
-        radii=radii,
-        error_fraction=error_fraction,
-        output_path=os.path.join(OUTPUT_DIR, "bulkflow_uniform.csv"),
-        parallel=parallel
-    )
+    delta_column = f"delta_{int(radius_overdensity)}"
 
-    # ------------------------------------------------------------
-    # 5. Done
-    # ------------------------------------------------------------
-    logger.info("All experiments completed successfully.")
-    logger.info(f"Results saved in: {OUTPUT_DIR}")
-    logger.info("=== Bulk Flow Analysis Finished ===")
+    # ===========================================
+    # 5. Choose n_lowest halos closest to zero overdensity
+    # ===========================================
+    logging.info(f"Selecting {n_lowest} lowest-|delta| halos...")
+    halos_df[f"delta_abs_{int(radius_overdensity)}"] = halos_df[delta_column].abs()
+    selected_points = halos_df.nsmallest(n_lowest, f"delta_abs_{int(radius_overdensity)}")
+
+    logging.info(f"Selected {len(selected_points)} origin points.")
+
+    # ===========================================
+    # 6. Loop over selected points
+    # ===========================================
+    for idx, row in selected_points.iterrows():
+        origin = (row["x"], row["y"], row["z"])
+        origin_id = int(row["rockstarid"])
+
+        logging.info(f"Processing origin ID {origin_id} at {origin}")
+
+        # ---------------------------------------
+        # 6.1 Make masks
+        # ---------------------------------------
+        cf4_mask_df = make_cf4_mask(
+            position=np.array(origin),
+            halos_df=halos_df,
+            cf4_df=cf4_df,
+            tree=tree,
+            box_size=box_size,
+            radius=1.0,
+            max_doublings=4
+        )
+
+        uniform_mask_df = make_uniform_mask(
+            position=np.array(origin),
+            radius=1.0,
+            df_halos=halos_df,
+            CF4_catalogue=cf4_df,
+            tree=tree
+        )
+
+        # ---------------------------------------
+        # 6.2 Compute bulk flow for each mask
+        # ---------------------------------------
+        bf_cf4 = calculate_bulk_flow_series(
+            halos_df=cf4_mask_df,
+            origin=origin,
+            r_max=r_max,
+            r_min=r_min,
+            r_jumps=r_jump,
+            error_frac=error_frac,
+            sigma_star=sigma_star,
+            sigma_min=sigma_min
+        )
+
+        bf_uniform = calculate_bulk_flow_series(
+            halos_df=uniform_mask_df,
+            origin=origin,
+            r_max=r_max,
+            r_min=r_min,
+            r_jumps=r_jump,
+            error_frac=error_frac,
+            sigma_star=sigma_star,
+            sigma_min=sigma_min
+        )
+
+        # ---------------------------------------
+        # 6.3 Save results
+        # ---------------------------------------
+        append_bulkflow_results(
+            bf_cf4,
+            origin_id=origin_id,
+            mask_name="cf4",
+            filename=output_file
+        )
+
+        append_bulkflow_results(
+            bf_uniform,
+            origin_id=origin_id,
+            mask_name="uniform",
+            filename=output_file
+        )
+
+    logging.info("All origins processed successfully!")
+    logging.info(f"Results saved to {output_file}")
 
 
-# ================================================================
-# ENTRY POINT
-# ================================================================
-
+# ------------------------------------------------------
+# Entry point
+# ------------------------------------------------------
 if __name__ == "__main__":
     main()
