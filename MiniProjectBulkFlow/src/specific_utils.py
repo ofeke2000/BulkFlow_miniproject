@@ -24,7 +24,7 @@ def distance(x1, y1, z1, x2, y2, z2):
 # ================================================================
 
 def radial_velocity_and_error_pbc(
-        halos: pd.DataFrame,
+        halos_df: pd.DataFrame,
         origin: Tuple[float, float, float],
         box_size: float = 1000.0,
         error_frac: float = 0.20,
@@ -43,11 +43,11 @@ def radial_velocity_and_error_pbc(
     """
 
     required = ('x', 'y', 'z', 'vx', 'vy', 'vz')
-    if not all(col in halos.columns for col in required):
-        raise ValueError(f"halos must contain columns: {required}")
+    if not all(col in halos_df.columns for col in required):
+        raise ValueError(f"halos_df must contain columns: {required}")
 
-    pos = halos[['x', 'y', 'z']].values.astype(float)
-    vel = halos[['vx', 'vy', 'vz']].values.astype(float)
+    pos = halos_df[['x', 'y', 'z']].values.astype(float)
+    vel = halos_df[['vx', 'vy', 'vz']].values.astype(float)
     origin = np.array(origin, dtype=float)
 
     # -----------------------------
@@ -80,11 +80,11 @@ def radial_velocity_and_error_pbc(
     # -----------------------------
     # Add columns to the DataFrame
     # -----------------------------
-    halos['radius_from_origin'] = r_norm
-    halos['rhat_x'] = r_hat[:, 0]
-    halos['rhat_y'] = r_hat[:, 1]
-    halos['rhat_z'] = r_hat[:, 2]
-    halos['v_rad'] = v_rad
-    halos['sigma_vrad'] = sigma
+    halos_df['radius_from_origin'] = r_norm
+    halos_df['rhat_x'] = r_hat[:, 0]
+    halos_df['rhat_y'] = r_hat[:, 1]
+    halos_df['rhat_z'] = r_hat[:, 2]
+    halos_df['v_rad'] = v_rad
+    halos_df['sigma_vrad'] = sigma
 
-    return halos
+    return halos_df

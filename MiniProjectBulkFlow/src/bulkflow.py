@@ -32,16 +32,11 @@ Notes / assumptions
 from typing import Iterable, Tuple
 import numpy as np
 import pandas as pd
-import logging
-import os
-from specific_utils import radial_velocity_and_error
+from specific_utils import radial_velocity_and_error_pbc
 
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-
-###########################################################################
+########################################################################
 # Compute A^-1 for multiple radii
-###########################################################################
-
+########################################################################
 import numpy as np
 
 def compute_Ainv(r_hat: np.ndarray, 
@@ -106,7 +101,7 @@ def compute_Ainv(r_hat: np.ndarray,
 
 
 ##########################################################################
-# Compute u_i(R) for multiple radii
+# Compute u_i(R) for single radii
 ##########################################################################
 
 def compute_bulk_flow_MLE_single_radius(
@@ -222,7 +217,7 @@ def compute_bulk_flow_table(
         Ainv = Ainv_dict[R]   # 3×3 inverse A at this radius
 
         # --- compute bulk flow for R ---
-        u_R = compute_bulk_flow_single_radius(
+        u_R = compute_bulk_flow_MLE_single_radius(
             r_hat=r_hat,
             r_sorted=r_sorted,
             radius=R,
@@ -247,94 +242,98 @@ def compute_bulk_flow_table(
 
 
 ##########################################################################
-# Bulk flow series (Not Good)
+# Bulk flow series (only function used in main code)
 ##########################################################################
 
-def compute_bulkflow_series(halos_df: pd.DataFrame,
-                            origin: Tuple[float, float, float],
-                            radii: Iterable[float],
-                            error_frac: float = 0.20,
-                            min_sigma: float = 50.0,
-                            min_count: int = 10,
-                            cumulative: bool = True) -> pd.DataFrame:
+def calculate_bulk_flow_series(
+    halos_df: pd.DataFrame,
+    origin: tuple,
+    r_max: float,
+    r_min: float,
+    r_jumps: float,
+    error_frac: float = 0.20,
+    sigma_star: float = 250.0,
+    sigma_min: float = 50.0
+):
     """
-    Compute ML bulk-flow estimates for a series of radii.
+    Compute the bulk flow as a function of radius, using the series (incremental)
+    calculation of A and A^{-1}.
 
     Parameters
     ----------
-    halos_df : pd.DataFrame
-        Halo catalog with columns ['x','y','z','vx','vy','vz'].
-    origin : tuple
-        (x0,y0,z0) coordinates (h^-1 Mpc) of the observer / origin.
-    radii : iterable of floats
-        Radii at which to compute bulk flow (h^-1 Mpc). If cumulative=True, halos with
-        distance <= R are used for radius R. Otherwise (cumulative=False) only halos
-        within shell (R-dR/2, R+dR/2) are used; but here we implement simple shells
-        by computing between consecutive radii if desired (user can pass appropriate bins).
+    halos_df : DataFrame
+        Must contain columns ['x','y','z','vx','vy','vz'].
+    origin : tuple of 3 floats
+        Point around which the radial velocities and radii are computed.
+    r_max, r_min : float
+        Minimum and maximum radius to evaluate.
+    r_jumps : float
+        Radius step between evaluations.
     error_frac : float
-        Fractional error for radial velocities (default 0.20).
-    min_sigma : float
-        Minimum sigma in velocity units.
-    min_count : int
-        Minimum number of objects required to compute a result; otherwise NaNs are returned.
-    cumulative : bool
-        If True (default), use cumulative sphere up to R. If False, use halos with distance
-        strictly within (prev_R, R] for successive radii; in that case pass radii as bin-edges.
+        Fractional velocity error used by radial_velocity_and_error_pbc.
+    sigma_star : float
+        Small-scale velocity parameter.
+    sigma_min : float
+        Floor on sigma (passed into radial_velocity_and_error_pbc).
 
     Returns
     -------
-    results_df : pd.DataFrame
-        DataFrame with columns:
-        ['R', 'N', 'Ux','Uy','Uz','U_mag','sigma_U', 'sigma_Ux','sigma_Uy','sigma_Uz']
+    velocities_df : DataFrame
+        Columns: [radius, u_x, u_y, u_z, U_total]
     """
-    # precompute displacements and radii of all halos relative to origin
-    pos = halos_df[['x', 'y', 'z']].values.astype(float)
-    disp = pos - np.array(origin, dtype=float).reshape((1, 3))
-    r_vals = np.linalg.norm(disp, axis=1)
 
-    results = []
-    radii_list = list(radii)
+    # ---------------------------------------------------------
+    # (1) Compute radial velocity, error, radii, unit vector
+    # ---------------------------------------------------------
+    halos_df = radial_velocity_and_error_pbc(
+            halos_df,
+            origin=origin,
+            box_size=1000.0,
+            error_frac=error_frac,
+            min_sigma=sigma_min
+        )
 
-    for idx_R, R in enumerate(radii_list):
-        if cumulative:
-            mask = (r_vals <= R)
-        else:
-            # use shells defined by previous radius (if idx_R == 0, use (0,R])
-            if idx_R == 0:
-                mask = (r_vals <= R)
-            else:
-                Rprev = radii_list[idx_R - 1]
-                mask = (r_vals > Rprev) & (r_vals <= R)
+    # ---------------------------------------------------------
+    # (2) radius list: r_min → r_max in steps of r_jumps
+    # ---------------------------------------------------------
+    r_list = np.arange(r_min, r_max + r_jumps, r_jumps)
 
-        sub = halos_df.loc[mask]
-        N = len(sub)
-        if N < min_count:
-            logging.info(f"R={R}: N={N} < min_count ({min_count}) -> returning NaNs.")
-            results.append({
-                'R': R, 'N': N,
-                'Ux': np.nan, 'Uy': np.nan, 'Uz': np.nan,
-                'U_mag': np.nan, 'sigma_U': np.nan,
-                'sigma_Ux': np.nan, 'sigma_Uy': np.nan, 'sigma_Uz': np.nan
-            })
-            continue
+    # ---------------------------------------------------------
+    # (3) extract arrays
+    # ---------------------------------------------------------
+    r_hat = halos_df[["r_hat_x","r_hat_y","r_hat_z"]].values
+    v_rad = halos_df["v_rad"].values
+    sigma = halos_df["sigma"].values
+    r_sorted = halos_df["r"].values
 
-        # compute v_rad, r_hat, sigma for this sub-sample
-        v_rad, r_hat, sigma = radial_velocity_and_error(sub, origin, error_frac=error_frac, min_sigma=min_sigma)
+    # Ensure halos are sorted by radius (required for series Ainv construction)
+    sort_idx = np.argsort(r_sorted)
+    r_sorted = r_sorted[sort_idx]
+    r_hat    = r_hat[sort_idx]
+    v_rad    = v_rad[sort_idx]
+    sigma    = sigma[sort_idx]
 
-        # ML estimate
-        U, covU = ml_bulk_flow(v_rad, r_hat, sigma)
+    # ---------------------------------------------------------
+    # (4) Compute A^{-1}(R) dict
+    # ---------------------------------------------------------
+    Ainv_dict = compute_Ainv(
+        r_hat=r_hat,
+        sigma=sigma,
+        r_sorted=r_sorted,
+        r_jumps=r_list
+    )
 
-        U_mag = np.linalg.norm(U)
-        # sigma_U taken as sqrt(trace(covU))/sqrt(3) as a single-number uncertainty (rms)
-        sigma_U = np.sqrt(np.trace(covU) / 3.0)
-        sigma_Ux, sigma_Uy, sigma_Uz = np.sqrt(np.diag(covU))
+    # ---------------------------------------------------------
+    # (5) Compute bulk flow table
+    # ---------------------------------------------------------
+    velocities_df = compute_bulk_flow_table(
+        r_hat=r_hat,
+        r_sorted=r_sorted,
+        r_list=r_list,
+        v_rad=v_rad,
+        sigma=sigma,
+        Ainv_dict=Ainv_dict,
+        sigma_star=sigma_star
+    )
 
-        results.append({
-            'R': R, 'N': N,
-            'Ux': U[0], 'Uy': U[1], 'Uz': U[2],
-            'U_mag': U_mag, 'sigma_U': sigma_U,
-            'sigma_Ux': sigma_Ux, 'sigma_Uy': sigma_Uy, 'sigma_Uz': sigma_Uz
-        })
-
-    results_df = pd.DataFrame(results)
-    return results_df
+    return velocities_df
