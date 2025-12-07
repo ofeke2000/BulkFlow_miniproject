@@ -1,15 +1,18 @@
-box_size: 1000.0           # h^-1 Mpc
+
 mask_type: cf4             # "cf4" or "uniform"
 
 MDPL2:
   HubbleParameter: 0.6777                 # Hubble parameter for distance conversions
+  box_size: 1000.0                        # h^-1 Mpc
 
-input_csv: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/mdpl2_rockstar_125_pid-1_mvir12.csv"
-cf4_csv: "~/bulk-flow-Rockstar/Data/cf4_group_catalogue/cf4_group_catalogue.csv"
-output_dir: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series"
+paths:
+  rockstar_catalog: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/mdpl2_rockstar_125_pid-1_mvir12.csv"
+  cf4_catalog: "~/bulk-flow-Rockstar/Data/cf4_group_catalogue/cf4_group_catalogue.csv"
+  output_dir: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/bulk_flow_radius_series"
 
 columns:
   - rockstarid
+  - mvir
   - x
   - y
   - z
@@ -19,15 +22,15 @@ columns:
 
 overdensity:
   radius: 5.0    # h^-1 Mpc
-
-experiment:
   n_lowest_delta: 50
+
+bulkflow:
   max_radius: 250.0          # h^-1 Mpc
   min_radius: 5.0            # h^-1 Mpc
   radii_step: 5              # h^-1 Mpc
   error_fraction: 0.2        # 20%
-  parallel: true
-  n_workers: max(1, cpu_count() - 1)  # parallel workers (set to 1 to run single-threaded)
+  sigma_star: 250.0          # km/s
+  sigma_min: 50.0            # km/s
 
 
 visualization:
