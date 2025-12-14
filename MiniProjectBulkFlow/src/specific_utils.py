@@ -82,11 +82,11 @@ def radial_velocity_and_error_pbc(
     # Add columns to the DataFrame
     # -----------------------------
     halos_df['radius_from_origin'] = r_norm
-    halos_df['rhat_x'] = r_hat[:, 0]
-    halos_df['rhat_y'] = r_hat[:, 1]
-    halos_df['rhat_z'] = r_hat[:, 2]
+    halos_df['r_hat_x'] = r_hat[:, 0]
+    halos_df['r_hat_y'] = r_hat[:, 1]
+    halos_df['r_hat_z'] = r_hat[:, 2]
     halos_df['v_rad'] = v_rad
-    halos_df['sigma_vrad'] = sigma
+    halos_df['sigma_v_rad'] = sigma
 
     return halos_df
 

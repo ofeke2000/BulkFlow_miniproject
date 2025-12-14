@@ -157,7 +157,7 @@ def main():
             cf4_df=cf4_df,
             tree=tree,
             box_size=box_size,
-            radius=8.0,
+            radius=50.0,
             max_doublings=5
         )
 

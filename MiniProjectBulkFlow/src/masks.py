@@ -53,6 +53,7 @@ def make_cf4_mask(position: np.ndarray,
 
     matched_rows = []
     used_indices = set()
+    search_multiplier = 0
 
     print(f"Starting CF4-like matching with radius = {radius} h^-1 Mpc...")
 
@@ -65,6 +66,8 @@ def make_cf4_mask(position: np.ndarray,
         # Try radius → 2R → 4R → ...
         for attempt in range(max_doublings + 1):
             idx = tree.query_ball_point(pos_cf4, search_radius)
+
+            search_multiplier += 1
 
             # Remove halos already matched to earlier CF4 entries
             idx = [j for j in idx if j not in used_indices]
@@ -99,7 +102,7 @@ def make_cf4_mask(position: np.ndarray,
         })
 
         if (i + 1) % 10_000 == 0:
-            print(f"  Matched {i+1:,}/{len(cf4_df):,}")
+            print(f"  Matched {i+1:,}/{len(cf4_df):,} with mean search multiplier {search_multiplier/(i+1)}.")
 
     matched_halos = pd.DataFrame(matched_rows)
     print(f"Matched {len(matched_halos):,} CF4 groups to halos.")

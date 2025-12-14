@@ -172,7 +172,7 @@ def compute_bulk_flow_MLE_single_radius(
 def compute_bulk_flow_table(
     r_hat: np.ndarray,
     r_sorted: np.ndarray,
-    r_jumps: np.ndarray,
+    r_list: np.ndarray,
     v_rad: np.ndarray,
     sigma: np.ndarray,
     Ainv_dict: dict,
@@ -187,7 +187,7 @@ def compute_bulk_flow_table(
         Unit vectors for halos.
     r_sorted : (N,)
         Radii of halos (sorted ascending).
-    r_jumps : array-like
+    r_list : array-like
         Radii at which to compute the bulk flow.
     v_rad : (N,)
         Radial velocities.
@@ -212,7 +212,7 @@ def compute_bulk_flow_table(
         "U_total": []
     }
 
-    for R in r_jumps:
+    for R in r_list:
 
         Ainv = Ainv_dict[R]   # 3×3 inverse A at this radius
 
@@ -303,8 +303,8 @@ def calculate_bulk_flow_series(
     # ---------------------------------------------------------
     r_hat = halos_df[["r_hat_x","r_hat_y","r_hat_z"]].values
     v_rad = halos_df["v_rad"].values
-    sigma = halos_df["sigma"].values
-    r_sorted = halos_df["r"].values
+    sigma = halos_df["sigma_v_rad"].values
+    r_sorted = halos_df["radius_from_origin"].values
 
     # Ensure halos are sorted by radius (required for series Ainv construction)
     sort_idx = np.argsort(r_sorted)
