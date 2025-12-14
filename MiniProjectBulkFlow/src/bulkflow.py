@@ -29,10 +29,10 @@ Notes / assumptions
   Cov(U) = A^{-1}.
 """
 
-from typing import Iterable, Tuple
+from typing import Iterable
 import numpy as np
 import pandas as pd
-from src.specific_utils import radial_velocity_and_error_pbc
+from .specific_utils import radial_velocity_and_error_pbc
 
 ########################################################################
 # Compute A^-1 for multiple radii

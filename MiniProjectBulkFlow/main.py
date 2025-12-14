@@ -3,9 +3,10 @@ import numpy as np
 import pandas as pd
 import logging
 import time
+import os
 from pathlib import Path
 
-from MDAnalysis.lib.pkdtree import PeriodicKDTree
+from scipy.spatial import cKDTree
 
 # --- Local modules ---
 from src.data_loader import load_rockstar_catalog, load_cf4_catalogue
@@ -58,12 +59,13 @@ def main():
     output_file = cfg["paths"]["output_file"]
 
     box_size = cfg["MDPL2"]["box_size"]
-    radius_overdensity = cfg["overdensity"]["radius"]
+    Hubble_Parameter = cfg["MDPL2"]["HubbleParameter"]
+    radius_overdensity = int(cfg["overdensity"]["radius"])
     n_lowest = cfg["overdensity"]["n_lowest_delta"]
 
     # bulkflow config
-    r_min = cfg["bulkflow"]["r_min"]
-    r_max = cfg["bulkflow"]["r_max"]
+    r_min = cfg["bulkflow"]["min_radius"]
+    r_max = cfg["bulkflow"]["max_radius"]
     r_jump = cfg["bulkflow"]["radii_step"]
     error_frac = cfg["bulkflow"]["error_fraction"]
     sigma_star = cfg["bulkflow"]["sigma_star"]
@@ -78,33 +80,51 @@ def main():
     logging.info("Loading Rockstar catalog...")
     halos_df = load_rockstar_catalog(rockstar_path)
 
+    # Fit Halos into box [0, box_size)
+    halos_df[['x','y','z']] %= box_size
+    logging.info("Rockstar catalog loaded and prepared.")
+
     logging.info("Loading CF4 catalog...")
-    cf4_df = load_cf4_catalogue(cf4_path)
+    cf4_df = load_cf4_catalogue(cf4_path, h=Hubble_Parameter)
 
     # ===========================================
-    # 3. Build PeriodicKDTree
+    # 3. Build cKDTree
     # ===========================================
     t0 = time.time()
-    logging.info("Building PeriodicKDTree...")
-    tree = PeriodicKDTree(halos_df[["x", "y", "z"]].values, boxsize=box_size)
+    logging.info("Building cKDTree...")
+    tree = cKDTree(halos_df[["x", "y", "z"]].values, boxsize=box_size)
+    logging.info("cKDTree built successfully.")
+    timings["load_and_prepare_data"] = time.time() - t0
 
     # ===========================================
     # 4. Compute overdensity
     # ===========================================
-    t0 = time.time()
-    logging.info("Computing overdensity...")
-    halos_df = compute_overdensity(
-        df=halos_df,
-        radius=radius_overdensity,
-        tree=tree,
-        box_size=box_size,
-        mass_column="mvir"
-    )
-    
-    # Save updated CSV, overwriting the original
-    halos_df.to_csv(os.path.join(rockstar_path), index=False)
 
-    delta_column = f"delta_{int(radius_overdensity)}"
+    delta_column = f"delta_{radius_overdensity}"
+
+    t0 = time.time()
+    logging.info(f"Computing overdensity ({delta_column})...")
+
+    if delta_column not in halos_df.columns:
+
+        halos_df = compute_overdensity(
+            df=halos_df,
+            radius=radius_overdensity,
+            tree=tree,
+            box_size=box_size,
+            mass_column="mvir"
+        )
+
+        halos_df.to_csv(rockstar_path, index=False)
+
+        logging.info(
+            f"Overdensity computed and saved "
+            f"(Δt = {time.time() - t0:.2f} s)"
+        )
+    else:
+        logging.info(
+            f"Column '{delta_column}' already exists — skipping overdensity computation."
+        )
 
     # ===========================================
     # 5. Choose n_lowest halos closest to zero overdensity
@@ -137,13 +157,13 @@ def main():
             cf4_df=cf4_df,
             tree=tree,
             box_size=box_size,
-            radius=1.0,
-            max_doublings=4
+            radius=8.0,
+            max_doublings=5
         )
 
         uniform_mask_df = make_uniform_mask(
             position=np.array(origin),
-            radius=1.0,
+            radius=r_max,
             df_halos=halos_df,
             CF4_catalogue=cf4_df,
             tree=tree

@@ -16,7 +16,7 @@ The result can be used to identify halos in 'average' environments (|delta_R| â‰
 import numpy as np
 import pandas as pd
 import sys
-from MDAnalysis.lib.pkdtree import PeriodicKDTree
+from scipy.spatial import cKDTree
 
 #################################################################
 # compute_overdensity
@@ -26,7 +26,7 @@ from MDAnalysis.lib.pkdtree import PeriodicKDTree
 def compute_overdensity(
     df: pd.DataFrame,
     radius: float = 5.0,
-    tree: PeriodicKDTree | None = None,
+    tree: cKDTree | None = None,
     box_size: float = 1000.0,
     mass_column: str = "mvir"
 ) -> pd.DataFrame:
@@ -39,7 +39,7 @@ def compute_overdensity(
         Halo catalog containing 'x', 'y', 'z', and mass column.
     radius : float
         Sphere radius in h^-1 Mpc.
-    tree : PeriodicKDTree
+    tree : cKDTree
         Pre-built tree (optional). 
     box_size : float
         Size of the simulation box in h^-1 Mpc.
@@ -59,9 +59,9 @@ def compute_overdensity(
         print(f"[INFO] Column '{delta_col}' already exists. Skipping computation.")
         return df
 
-    # --- Build tree if not provided ---
+    # --- If tree not provided ---
     if tree is None:
-        sys.exit("No tree proveded. Please provide a pre-built PeriodicKDTree.")
+        sys.exit("No tree provided. Please provide a pre-built cKDTree.")
 
     # --- Mean mass density ---
     box_volume = box_size**3
@@ -81,14 +81,14 @@ def compute_overdensity(
         pos = positions[i]
 
         # periodic tree search
-        indices = tree.search(pos, radius)
+        indices = tree.query_ball_point(pos, radius)
 
         local_mass = df.iloc[indices][mass_column].sum()
         rho_local = local_mass / V_R
 
         overdensity[i] = (rho_local - rho_mean) / rho_mean
 
-        if i  == len(df)/2 and i > 0:
+        if i % 500000 == 0 and i > 0:
             print(f"  Processed {i:,} halos...")
 
     print("Done computing overdensity.")

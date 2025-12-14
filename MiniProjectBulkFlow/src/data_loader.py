@@ -55,7 +55,7 @@ def load_cf4_catalogue(path: str, h: float = 0.7) -> pd.DataFrame:
 
     # Rename for consistency
     rename_map = {
-        'PGC': 'id',
+        'pgc': 'id',
         'RA': 'ra',
         'DE': 'dec',
         'DM_av': 'distance_modulus',
@@ -68,7 +68,7 @@ def load_cf4_catalogue(path: str, h: float = 0.7) -> pd.DataFrame:
     print(f"After cleaning: {len(df):,} groups remain.")
 
     # Convert distance modulus to distance in Mpc/h
-    df['distance'] = distance_modulus_to_mpc(df['distance_modulus'].values)
+    df['distance'] = distance_modulus_to_mpc(df['distance_modulus'].values, h=h)
 
     # Convert coordinates to Cartesian
     df = cf4_to_cartesian(df)

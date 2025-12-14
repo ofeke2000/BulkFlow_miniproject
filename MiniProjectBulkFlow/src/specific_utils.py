@@ -26,7 +26,7 @@ def distance(x1, y1, z1, x2, y2, z2):
 
 def radial_velocity_and_error_pbc(
         halos_df: pd.DataFrame,
-        origin: Tuple[float, float, float],
+        origin: tuple[float, float, float],
         box_size: float = 1000.0,
         error_frac: float = 0.20,
         min_sigma: float = 50.0) -> pd.DataFrame:

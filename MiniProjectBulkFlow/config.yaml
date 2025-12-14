@@ -6,9 +6,9 @@ MDPL2:
   box_size: 1000.0                        # h^-1 Mpc
 
 paths:
-  rockstar_catalog: "~/bulk-flow-Rockstar/Data/mdpl2_rockstar_125_pid-1_mvir12/mdpl2_rockstar_125_pid-1_mvir12.csv"
-  cf4_catalog: "~/bulk-flow-Rockstar/Data/cf4_group_catalogue/cf4_group_catalogue.csv"
-  output_dir: "~/BulkFlow_miniproject/BulkFlow_miniproject/output/Quick_test_bulkflow_results.h5"
+  rockstar_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv" 
+  cf4_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
+  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/Quick_test_bulkflow_results.h5"
 
 columns:
   - rockstarid
@@ -26,8 +26,8 @@ overdensity:
 
 bulkflow:
   max_radius: 250.0          # h^-1 Mpc
-  min_radius: 5.0            # h^-1 Mpc
-  radii_step: 5              # h^-1 Mpc
+  min_radius: 50.0           # h^-1 Mpc
+  radii_step: 50.0           # h^-1 Mpc
   error_fraction: 0.2        # 20%
   sigma_star: 250.0          # km/s
   sigma_min: 50.0            # km/s

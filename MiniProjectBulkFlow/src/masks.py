@@ -12,7 +12,7 @@ The goal is to reproduce the observational selection function in the simulation.
 
 import numpy as np
 import pandas as pd
-from MDAnalysis.lib.pkdtree import PeriodicKDTree
+from scipy.spatial import cKDTree
 
 ##################################################################
 # CF4-like mask
@@ -21,7 +21,7 @@ from MDAnalysis.lib.pkdtree import PeriodicKDTree
 def make_cf4_mask(position: np.ndarray,
                   halos_df: pd.DataFrame,
                   cf4_df: pd.DataFrame,
-                  tree: PeriodicKDTree,
+                  tree: cKDTree,
                   box_size: float = 1000.0,
                   radius: float = 1.0,
                   max_doublings: int = 4) -> pd.DataFrame:
@@ -64,7 +64,7 @@ def make_cf4_mask(position: np.ndarray,
 
         # Try radius → 2R → 4R → ...
         for attempt in range(max_doublings + 1):
-            idx = tree.search(pos_cf4, radius=search_radius)
+            idx = tree.query_ball_point(pos_cf4, search_radius)
 
             # Remove halos already matched to earlier CF4 entries
             idx = [j for j in idx if j not in used_indices]
@@ -114,7 +114,7 @@ def make_uniform_mask(
     radius: float,
     df_halos: pd.DataFrame,
     CF4_catalogue: pd.DataFrame,
-    tree: PeriodicKDTree
+    tree: cKDTree
 ) -> pd.DataFrame:
     """
     Select a uniform random set of halos within a sphere of given radius
@@ -132,7 +132,7 @@ def make_uniform_mask(
         Simulation halo catalog (with x,y,z and other columns).
     CF4_catalogue : DataFrame
         Reference catalog used only to set the number of halos.
-    tree : PeriodicKDTree
+    tree : cKDTree
         Pre-built periodic KDTree for df_halos.
 
     Returns
@@ -142,14 +142,14 @@ def make_uniform_mask(
     """
 
     # Query using periodic boundary conditions
-    neighbor_indices = tree.search(position, radius)
+    neighbor_indices = tree.query_ball_point(position, radius)
 
     # candidate halos: FULL rows, not just coordinates
     df_candidates = df_halos.iloc[neighbor_indices]
 
-    # Ensure 'R' column exists in CF4_catalogue
-    if 'R' not in CF4_catalogue.columns:
-        raise ValueError("CF4_catalogue must contain column 'R' (distance).")
+    # Ensure 'distance' column exists in CF4_catalogue
+    if 'distance' not in CF4_catalogue.columns:
+        raise ValueError("CF4_catalogue must contain column 'distance'.")
 
     # Number of CF4 galaxies inside the radius
     n_pick = np.sum(CF4_catalogue['distance'] <= radius)
@@ -162,5 +162,7 @@ def make_uniform_mask(
     replace = len(df_candidates) < n_pick
 
     selected = df_candidates.sample(n=n_pick, replace=replace)
+
+    print(f"Randomized {len(selected):,} Uniform halos.")
 
     return selected.reset_index(drop=True)
