@@ -64,9 +64,9 @@ def main():
     n_lowest = cfg["overdensity"]["n_lowest_delta"]
 
     # bulkflow config
-    r_min = cfg["bulkflow"]["min_radius"]
-    r_max = cfg["bulkflow"]["max_radius"]
-    r_jump = cfg["bulkflow"]["radii_step"]
+    r_min = int(cfg["bulkflow"]["min_radius"])
+    r_max = int(cfg["bulkflow"]["max_radius"])
+    r_jump = int(cfg["bulkflow"]["radii_step"])
     error_frac = cfg["bulkflow"]["error_fraction"]
     sigma_star = cfg["bulkflow"]["sigma_star"]
     sigma_min = cfg["bulkflow"]["sigma_min"]
@@ -169,6 +169,9 @@ def main():
             tree=tree
         )
 
+        t_origin = time.time()
+        logging.info(f" Masks created. CF4 mask size: {len(cf4_mask_df)}, Uniform mask size: {len(uniform_mask_df)}")
+
         # ---------------------------------------
         # 6.2 Compute bulk flow for each mask
         # ---------------------------------------
@@ -194,6 +197,11 @@ def main():
             sigma_min=sigma_min
         )
 
+        logging.info(f" Bulk flows computed. CF4 bulk flow size: {len(bf_cf4)}, Uniform bulk flow size: {len(bf_uniform)}")
+        logging.info(f" Bulk flow is {bf_cf4['U_total'].iloc[-1]}")
+
+        breakpoint
+
         # ---------------------------------------
         # 6.3 Save results
         # ---------------------------------------
@@ -210,6 +218,8 @@ def main():
             mask_name="uniform",
             filename=output_file
         )
+
+        logging.info(f" Results appended to {output_file}.")
 
         per_origin_times.append(time.time() - t_origin)
 

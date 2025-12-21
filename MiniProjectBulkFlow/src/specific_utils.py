@@ -131,7 +131,14 @@ def append_bulkflow_results(
     df_to_store["origin_id"] = origin_id
     df_to_store["mask"] = mask_name
 
-    # Reorder columns for cleanliness (optional but recommended)
+    # Ensure correct dtypes
+    df_to_store["origin_id"] = df_to_store["origin_id"].astype(int)
+    df_to_store["mask"] = df_to_store["mask"].astype(str)  # will set min_itemsize later
+    df_to_store[["radius", "u_x", "u_y", "u_z", "U_total"]] = df_to_store[
+        ["radius", "u_x", "u_y", "u_z", "U_total"]
+    ].astype(float)
+
+    # Reorder columns for cleanliness (HDF5 is strict about column order)
     df_to_store = df_to_store[
         ["origin_id", "mask", "radius", "u_x", "u_y", "u_z", "U_total"]
     ]
@@ -142,5 +149,6 @@ def append_bulkflow_results(
         key="bulkflow",
         format="table",     # allow append and filtering
         mode="a",           # append mode
-        append=True
+        append=True,
+        min_itemsize={"mask": 8}  # set large enough to hold all strings
     )
