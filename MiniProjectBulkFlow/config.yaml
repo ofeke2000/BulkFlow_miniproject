@@ -22,12 +22,12 @@ columns:
 
 overdensity:
   radius: 5.0    # h^-1 Mpc
-  n_lowest_delta: 1
+  n_lowest_delta: 50
 
 bulkflow:
   max_radius: 250.0          # h^-1 Mpc
-  min_radius: 50.0           # h^-1 Mpc
-  radii_step: 50.0           # h^-1 Mpc
+  min_radius: 5.0           # h^-1 Mpc
+  radii_step: 5.0           # h^-1 Mpc
   error_fraction: 0.2        # 20%
   sigma_star: 250.0          # km/s
   sigma_min: 50.0            # km/s

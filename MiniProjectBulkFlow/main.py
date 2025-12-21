@@ -200,8 +200,6 @@ def main():
         logging.info(f" Bulk flows computed. CF4 bulk flow size: {len(bf_cf4)}, Uniform bulk flow size: {len(bf_uniform)}")
         logging.info(f" Bulk flow is {bf_cf4['U_total'].iloc[-1]}")
 
-        breakpoint
-
         # ---------------------------------------
         # 6.3 Save results
         # ---------------------------------------
