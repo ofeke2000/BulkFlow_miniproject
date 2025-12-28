@@ -8,7 +8,7 @@ MDPL2:
 paths:
   rockstar_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv" 
   cf4_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
-  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/Quick_test_bulkflow_results.h5"
+  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/bulkflow_results_max250_min_50_jump25_points5.h5"
 
 columns:
   - rockstarid
@@ -22,12 +22,12 @@ columns:
 
 overdensity:
   radius: 5.0    # h^-1 Mpc
-  n_lowest_delta: 50
+  n_lowest_delta: 1
 
 bulkflow:
   max_radius: 250.0          # h^-1 Mpc
-  min_radius: 5.0           # h^-1 Mpc
-  radii_step: 5.0           # h^-1 Mpc
+  min_radius: 50.0           # h^-1 Mpc
+  radii_step: 25.0           # h^-1 Mpc
   error_fraction: 0.2        # 20%
   sigma_star: 250.0          # km/s
   sigma_min: 50.0            # km/s

@@ -118,7 +118,7 @@ def distance_modulus_to_mpc(mu: float | np.ndarray, h: float = 0.7) -> np.ndarra
         Comoving distance in Mpc/h.
     """
     # Convert to luminosity distance in Mpc
-    d_l_mpc = (10 ** ((mu - 25) / 5))/(10**6)
+    d_l_mpc = (10 ** ((mu + 5) / 5))/(10**6)
 
     # Convert to comoving distance in Mpc/h
     distance = d_l_mpc * h

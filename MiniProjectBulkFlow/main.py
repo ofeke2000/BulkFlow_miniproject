@@ -87,6 +87,20 @@ def main():
     logging.info("Loading CF4 catalog...")
     cf4_df = load_cf4_catalogue(cf4_path, h=Hubble_Parameter)
 
+    # -------------------------------------------
+    # Filter CF4 galaxies inside r_max
+    # -------------------------------------------
+    n_before = len(cf4_df)
+
+    cf4_df = cf4_df[cf4_df["distance"] <= r_max].copy()
+
+    n_after = len(cf4_df)
+
+    logging.info(
+        f"Filtered CF4 catalogue to r <= {r_max:.1f} : "
+        f"{n_before} → {n_after} galaxies"
+    )
+
     # ===========================================
     # 3. Build cKDTree
     # ===========================================
@@ -157,7 +171,7 @@ def main():
             cf4_df=cf4_df,
             tree=tree,
             box_size=box_size,
-            radius=50.0,
+            radius=5.0,
             max_doublings=5
         )
 

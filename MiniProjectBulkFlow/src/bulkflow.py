@@ -32,6 +32,7 @@ Notes / assumptions
 from typing import Iterable
 import numpy as np
 import pandas as pd
+from scipy.linalg import lu_factor, lu_solve
 from .specific_utils import radial_velocity_and_error_pbc
 
 def bulk_flow_chi2_cumulative(
@@ -91,11 +92,39 @@ def bulk_flow_chi2_cumulative(
 
             idx += 1
 
-        # Solve A u = b (only if well-conditioned)
+        # Solve A u = b using LU decomposition
         try:
-            u = np.linalg.solve(A, b)
-        except np.linalg.LinAlgError:
+
+
+            print("\nMatrix A:")
+            print(A)
+
+            lu, piv = lu_factor(A)
+            u = lu_solve((lu, piv), b)
+        except Exception:
+            print("\n=== BULK FLOW SOLVER FAILURE ===")
+            print(f"Radius R = {R}")
+            print(f"Number of objects used = {idx}")
+
+            print("\nMatrix A:")
+            print(A)
+
+            detA = np.linalg.det(A)
+            print(f"\ndet(A) = {detA:.3e}")
+
+            eigvals = np.linalg.eigvalsh(A)  # symmetric → more stable
+            print("\nEigenvalues of A:")
+            print(eigvals)
+
+            cond = np.inf
+            if np.min(np.abs(eigvals)) > 0:
+                cond = np.max(np.abs(eigvals)) / np.min(np.abs(eigvals))
+            print(f"\nCondition number estimate = {cond:.3e}")
+
+            print("================================\n")
+
             u = np.array([np.nan, np.nan, np.nan])
+
 
         U = np.linalg.norm(u)
 
