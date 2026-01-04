@@ -95,18 +95,17 @@ def bulk_flow_chi2_cumulative(
         # Solve A u = b using LU decomposition
         try:
 
-
-            print("\nMatrix A:")
-            print(A)
-
             lu, piv = lu_factor(A)
             u = lu_solve((lu, piv), b)
+            
         except Exception:
             print("\n=== BULK FLOW SOLVER FAILURE ===")
             print(f"Radius R = {R}")
             print(f"Number of objects used = {idx}")
 
             print("\nMatrix A:")
+            print(f"idx = {idx}")
+            print(f"Radius R = {R}")
             print(A)
 
             detA = np.linalg.det(A)

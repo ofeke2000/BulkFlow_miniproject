@@ -14,6 +14,7 @@ from src.overdensity import compute_overdensity
 from src.masks import make_cf4_mask, make_uniform_mask
 from src.bulkflow import calculate_bulk_flow_series
 from src.specific_utils import append_bulkflow_results
+from src.visualize import plot_bulkflow_from_hdf5, plot_distance_histogram
 
 
 # ------------------------------------------------------
@@ -56,6 +57,7 @@ def main():
 
     rockstar_path = cfg["paths"]["rockstar_catalog"]
     cf4_path = cfg["paths"]["cf4_catalog"]
+    output_folder = cfg["paths"]["output_folder"]
     output_file = cfg["paths"]["output_file"]
 
     box_size = cfg["MDPL2"]["box_size"]
@@ -175,12 +177,26 @@ def main():
             max_doublings=5
         )
 
+        plot_distance_histogram(
+            data_df=cf4_mask_df,
+            output_folder=output_folder,
+            output_file="cf4_mask_histogram_lin.png",
+            bins=50
+        )
+
         uniform_mask_df = make_uniform_mask(
             position=np.array(origin),
             radius=r_max,
             df_halos=halos_df,
             CF4_catalogue=cf4_df,
             tree=tree
+        )
+
+        plot_distance_histogram(
+            data_df=uniform_mask_df,
+            output_folder=output_folder,
+            output_file="uniform_mask_histogram_lin.png",
+            bins=50
         )
 
         t_origin = time.time()
@@ -234,6 +250,17 @@ def main():
         logging.info(f" Results appended to {output_file}.")
 
         per_origin_times.append(time.time() - t_origin)
+
+    # ===========================================
+    # 7. Visualize results
+    # ===========================================
+
+    plot_bulkflow_from_hdf5(
+        hdf_file=output_file,
+        output_folder=output_folder,
+        key="bulkflow",
+        output_file="bulkflow_vs_radius.png"
+    )
 
     timings["process_all_origins"] = time.time() - t0
     timings["mean_origin_time"] = np.mean(per_origin_times)
