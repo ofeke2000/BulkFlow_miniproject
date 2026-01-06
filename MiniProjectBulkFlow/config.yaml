@@ -21,9 +21,10 @@ columns:
   - vy
   - vz
 
-overdensity:
-  radius: 5.0    # h^-1 Mpc
-  n_lowest_delta: 1
+origin_configs:
+  overdensity_radius: 3.0    # h^-1 Mpc
+  bulkflow_radius: 3.0     # h^-1 Mpc
+  number_of_origins: 1
 
 bulkflow:
   max_radius: 250.0          # h^-1 Mpc

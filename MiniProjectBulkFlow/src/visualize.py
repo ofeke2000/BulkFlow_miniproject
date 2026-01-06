@@ -5,6 +5,7 @@ import os
 import logging
 
 #reference line "from .data_loader import load_cf4_catalogue"
+from .specific_utils import add_periodic_distance
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -78,6 +79,7 @@ def plot_distance_histogram(
         data_df, 
         output_folder="plots", 
         output_file="cf4_histogram_lin.png", 
+        origin=(0,0,0),
         bins=50
         ):
 
@@ -85,17 +87,22 @@ def plot_distance_histogram(
     if "distance" not in data_df.columns:
         if all(col in data_df.columns for col in ["x", "y", "z"]):
             # Distance formula: sqrt(x^2 + y^2 + z^2)
-            data_df["distance"] = np.sqrt(data_df["x"]**2 + data_df["y"]**2 + data_df["z"]**2)
+            data_df = add_periodic_distance(
+                            df=data_df,
+                            origin=origin,
+                            box_size=1000.0,
+                            distance_col="distance"
+                        )
         else:
             raise KeyError("The dataframe is missing 'distance' and cannot find 'x, y, z' to calculate it.")
 
     #Plotting
     plt.figure(figsize=(10, 6))
-    plt.hist(data_df["distance"], bins=bins, color='skyblue', edgecolor='black')
+    plt.hist(data_df["distance"], bins=bins)
     
     plt.xlabel("Distance")
-    plt.ylabel("Number of CF4 groups")
-    plt.title("CF4 Catalogue Distance Distribution")
+    plt.ylabel("Number of Objects")
+    plt.title(output_file.replace("_", " ").replace(".png", ""))
     plt.grid(True, linestyle='--', alpha=0.7)
     
     # Ensure output folder exists and save plot there

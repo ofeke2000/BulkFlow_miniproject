@@ -13,12 +13,57 @@ def weighted_average(values, weights):
     return np.sum(values * weights) / np.sum(weights)
 
 # ================================================================
-# Distance computations
+# Periodic distance computations
 # ================================================================
 
-def distance(x1, y1, z1, x2, y2, z2):
-    """Compute Euclidean distance between two points or arrays."""
-    return np.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+def add_periodic_distance(
+    df: pd.DataFrame,
+    origin: np.ndarray,
+    box_size: float,
+    distance_col: str = "r"
+) -> pd.DataFrame:
+    """
+    Add periodic (minimum-image) distance from an origin to a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Must contain columns ['x', 'y', 'z'].
+    origin : array-like, shape (3,)
+        Origin point (x0, y0, z0).
+    box_size : float
+        Size of the periodic box.
+    distance_col : str
+        Name of the distance column to add.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Copy of df with an added column `distance_col`.
+    """
+
+    origin = np.asarray(origin)
+
+    if origin.shape != (3,):
+        raise ValueError("origin must be a 3-element vector")
+
+    # Displacement vector
+    dx = df["x"].values - origin[0]
+    dy = df["y"].values - origin[1]
+    dz = df["z"].values - origin[2]
+
+    # Minimum-image convention
+    dx -= box_size * np.round(dx / box_size)
+    dy -= box_size * np.round(dy / box_size)
+    dz -= box_size * np.round(dz / box_size)
+
+    # Euclidean distance
+    r = np.sqrt(dx**2 + dy**2 + dz**2)
+
+    df_out = df.copy()
+    df_out[distance_col] = r
+
+    return df_out
 
 # ================================================================
 # Create Radial velocity Column

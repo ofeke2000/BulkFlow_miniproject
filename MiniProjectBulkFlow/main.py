@@ -12,9 +12,10 @@ from scipy.spatial import cKDTree
 from src.data_loader import load_rockstar_catalog, load_cf4_catalogue
 from src.overdensity import compute_overdensity
 from src.masks import make_cf4_mask, make_uniform_mask
-from src.bulkflow import calculate_bulk_flow_series
+from src.bulkflow import calculate_bulk_flow_series, calculate_local_bulkflow
 from src.specific_utils import append_bulkflow_results
 from src.visualize import plot_bulkflow_from_hdf5, plot_distance_histogram
+from src.near_virgo import near_virgo
 
 
 # ------------------------------------------------------
@@ -62,8 +63,9 @@ def main():
 
     box_size = cfg["MDPL2"]["box_size"]
     Hubble_Parameter = cfg["MDPL2"]["HubbleParameter"]
-    radius_overdensity = int(cfg["overdensity"]["radius"])
-    n_lowest = cfg["overdensity"]["n_lowest_delta"]
+    radius_overdensity = int(cfg["origin_configs"]["overdensity_radius"])
+    radius_bulkflow = int(cfg["origin_configs"]["bulkflow_radius"])
+    n_lowest = cfg["origin_configs"]["number_of_origins"]
 
     # bulkflow config
     r_min = int(cfg["bulkflow"]["min_radius"])
@@ -89,6 +91,13 @@ def main():
     logging.info("Loading CF4 catalog...")
     cf4_df = load_cf4_catalogue(cf4_path, h=Hubble_Parameter)
 
+    plot_distance_histogram(
+        data_df=halos_df,
+        output_folder=output_folder,
+        output_file="test_rockstar_histogram_lin.png",
+        bins=100
+    )
+
     # -------------------------------------------
     # Filter CF4 galaxies inside r_max
     # -------------------------------------------
@@ -113,44 +122,155 @@ def main():
     timings["load_and_prepare_data"] = time.time() - t0
 
     # ===========================================
-    # 4. Compute overdensity
+    # 4. Environmental tests at origin positions
     # ===========================================
 
-    delta_column = f"delta_{radius_overdensity}"
+    delta_column = f"delta_{int(radius_overdensity)}"
+    virgo_column = "near_virgo"
+    bulkflow_column = f"bulkflow_{int(radius_bulkflow)}"
 
     t0 = time.time()
-    logging.info(f"Computing overdensity ({delta_column})...")
+    logging.info("Checking environmental test columns...")
+
+    # --------------------------------------------------
+    # 4.0 Check which tests already exist
+    # --------------------------------------------------
+    missing_tests = []
 
     if delta_column not in halos_df.columns:
+        missing_tests.append("overdensity")
 
-        halos_df = compute_overdensity(
-            df=halos_df,
-            radius=radius_overdensity,
-            tree=tree,
-            box_size=box_size,
-            mass_column="mvir"
-        )
+    if virgo_column not in halos_df.columns:
+        missing_tests.append("virgo")
 
-        halos_df.to_csv(rockstar_path, index=False)
+    if bulkflow_column not in halos_df.columns:
+        missing_tests.append("bulkflow")
 
+    if not missing_tests:
         logging.info(
-            f"Overdensity computed and saved "
-            f"(Δt = {time.time() - t0:.2f} s)"
+            "All environmental test columns already exist "
+            "— skipping section 4 entirely."
         )
     else:
         logging.info(
-            f"Column '{delta_column}' already exists — skipping overdensity computation."
+            f"Missing tests detected: {', '.join(missing_tests)}"
         )
 
+        # --------------------------------------------------
+        # 4.1 Local overdensity
+        # --------------------------------------------------
+        if "overdensity" in missing_tests:
+            logging.info(f"Computing overdensity ({delta_column})...")
+
+            halos_df = compute_overdensity(
+                df=halos_df,
+                radius=radius_overdensity,
+                tree=tree,
+                box_size=box_size,
+                mass_column="mvir"
+            )
+
+            logging.info(
+                f"Overdensity computed "
+                f"(Δt = {time.time() - t0:.2f} s)"
+            )
+        else:
+            logging.info(
+                f"Column '{delta_column}' exists — skipping overdensity."
+            )
+
+        # --------------------------------------------------
+        # 4.2 Near-Virgo test
+        # --------------------------------------------------
+        if "virgo" in missing_tests:
+            logging.info("Running Virgo environment test...")
+
+            halos_df = near_virgo(
+                df=halos_df,
+                box_size=box_size,
+                mass_threshold=1e14,  # h^-1 Msun
+                r_min=7.0,  # h^-1 Mpc, 10 in Mpc
+                r_max=14.0  # h^-1 Mpc, 20 in Mpc
+            )
+
+            logging.info("Virgo test completed.")
+        else:
+            logging.info(
+                f"Column '{virgo_column}' exists — skipping Virgo test."
+            )
+
+        # --------------------------------------------------
+        # 4.3 Local bulk flow test
+        # --------------------------------------------------
+        if "bulkflow" in missing_tests:
+            logging.info("Computing local bulk flow environment...")
+
+            halos_df = calculate_local_bulkflow(
+                df=halos_df,
+                tree=tree,
+                radius=radius_bulkflow,
+                velocity_columns=("vx", "vy", "vz"),
+            )
+
+            logging.info("Local bulk flow test completed.")
+        else:
+            logging.info(
+                f"Column '{bulkflow_column}' exists — skipping bulk flow test."
+            )
+
+        # --------------------------------------------------
+        # 4.4 Save once if anything was computed
+        # --------------------------------------------------
+        halos_df.to_csv(rockstar_path, index=False)
+
+        logging.info(
+            f"Environmental tests updated and saved "
+            f"(total Δt = {time.time() - t0:.2f} s)"
+        )
+        
+
+
     # ===========================================
-    # 5. Choose n_lowest halos closest to zero overdensity
+    # 5. Select Virgo-like, quiet overdensity, proper bulk flow
     # ===========================================
     t0 = time.time()
-    logging.info(f"Selecting {n_lowest} lowest-|delta| halos...")
-    halos_df[f"delta_abs_{int(radius_overdensity)}"] = halos_df[delta_column].abs()
-    selected_points = halos_df.nsmallest(n_lowest, f"delta_abs_{int(radius_overdensity)}")
+    logging.info("Selecting Earth-like local environments...")
 
-    logging.info(f"Selected {len(selected_points)} origin points.")
+    # --- sanity checks ---
+    required_cols = [bulkflow_column, delta_column, virgo_column]
+    missing = [c for c in required_cols if c not in halos_df.columns]
+    if missing:
+        raise KeyError(f"Missing required columns: {missing}")
+
+    # --- absolute overdensity ---
+    delta_abs_col = f"delta_abs_{int(radius_overdensity)}"
+    halos_df[delta_abs_col] = halos_df[delta_column].abs()
+
+    # --- selection mask ---
+    mask = (
+        (halos_df[bulkflow_column].between(400.0, 600.0)) &          # local bulk flow
+        (halos_df[delta_abs_col] < delta_tolerance) &       # |δ| ≈ 0
+        (halos_df[virgo_column] > 0)                            # Virgo nearby
+    )
+
+    candidates = halos_df.loc[mask]
+
+    logging.info(f"Found {len(candidates)} candidates after physical cuts.")
+
+    # --- rank by closest to zero overdensity ---
+    selected_points = (
+        candidates
+        .sort_values(delta_abs_col)
+        .head(n_lowest)
+    )
+
+    logging.info(
+        f"Selected {len(selected_points)} origin points "
+        f"(|δ| min={selected_points[delta_abs_col].min():.3e})."
+    )
+
+    logging.info(f"Selection completed in {time.time() - t0:.2f} s.")
+
 
     # ===========================================
     # 6. Loop over selected points
@@ -181,6 +301,7 @@ def main():
             data_df=cf4_mask_df,
             output_folder=output_folder,
             output_file="cf4_mask_histogram_lin.png",
+            origin=origin,
             bins=50
         )
 
@@ -196,7 +317,16 @@ def main():
             data_df=uniform_mask_df,
             output_folder=output_folder,
             output_file="uniform_mask_histogram_lin.png",
+            origin=origin,
             bins=50
+        )
+
+        plot_distance_histogram(
+        data_df=halos_df,
+        output_folder=output_folder,
+        output_file="test_rockstar_histogram_near_origin_lin.png",
+        origin=origin,
+        bins=50
         )
 
         t_origin = time.time()

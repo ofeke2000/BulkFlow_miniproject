@@ -32,6 +32,8 @@ Notes / assumptions
 from typing import Iterable
 import numpy as np
 import pandas as pd
+import logging
+from scipy.spatial import cKDTree
 from scipy.linalg import lu_factor, lu_solve
 from .specific_utils import radial_velocity_and_error_pbc
 
@@ -224,3 +226,80 @@ def calculate_bulk_flow_series(
     )
 
     return velocities_df
+
+def calculate_local_bulkflow(
+    df,
+    tree: cKDTree,
+    radius: float,
+    velocity_columns=("vx", "vy", "vz"),
+    output_prefix="bulkflow"
+):
+    """
+    Calculate local bulk flow for each halo by averaging velocities of neighbors
+    within a given radius.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Halo catalog containing positions and velocities.
+    tree : scipy.spatial.cKDTree
+        KDTree built from halo positions (x, y, z).
+    radius : float
+        Radius within which to compute the local bulk flow.
+    velocity_columns : tuple of str, optional
+        Names of velocity columns (vx, vy, vz).
+    output_prefix : str, optional
+        Prefix for output column name.
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        DataFrame with an added column:
+        f"{output_prefix}_{int(radius)}"
+    """
+
+    colname = f"{output_prefix}_{int(radius)}"
+
+    # ------------------------------------------
+    # Skip if already exists
+    # ------------------------------------------
+    if colname in df.columns:
+        logging.info(
+            f"Column '{colname}' already exists — skipping local bulk flow calculation."
+        )
+        return df
+
+    logging.info(f"Computing local bulk flow within R = {radius}...")
+
+    vx, vy, vz = velocity_columns
+    N = len(df)
+
+    bulkflow = np.zeros(N, dtype=np.float64)
+
+    # ------------------------------------------
+    # Loop over halos
+    # ------------------------------------------
+    for i in range(N):
+        # Find neighbors within radius
+        idx = tree.query_ball_point(tree.data[i], r=radius)
+
+        if len(idx) == 0:
+            bulkflow[i] = np.nan
+            continue
+
+        # Average velocity components
+        v_mean = df.iloc[idx][[vx, vy, vz]].mean().values
+
+        # Total bulk flow magnitude
+        bulkflow[i] = np.linalg.norm(v_mean)
+
+    # ------------------------------------------
+    # Save to DataFrame
+    # ------------------------------------------
+    df[colname] = bulkflow
+
+    logging.info(
+        f"Local bulk flow '{colname}' computed for {N} halos."
+    )
+
+    return df
