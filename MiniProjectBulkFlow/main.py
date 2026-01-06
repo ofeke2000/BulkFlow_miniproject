@@ -236,28 +236,21 @@ def main():
     t0 = time.time()
     logging.info("Selecting Earth-like local environments...")
 
-    # --- sanity checks ---
-    required_cols = [bulkflow_column, delta_column, virgo_column]
-    missing = [c for c in required_cols if c not in halos_df.columns]
-    if missing:
-        raise KeyError(f"Missing required columns: {missing}")
-
-    # --- absolute overdensity ---
+    # --- absolute overdensity (for ranking only) ---
     delta_abs_col = f"delta_abs_{int(radius_overdensity)}"
     halos_df[delta_abs_col] = halos_df[delta_column].abs()
 
-    # --- selection mask ---
+    # --- physical filters only ---
     mask = (
-        (halos_df[bulkflow_column].between(400.0, 600.0)) &          # local bulk flow
-        (halos_df[delta_abs_col] < delta_tolerance) &       # |δ| ≈ 0
-        (halos_df[virgo_column] > 0)                            # Virgo nearby
+        (halos_df[bulkflow_column].between(400.0, 600.0)) &
+        (halos_df[virgo_column] > 0)
     )
 
     candidates = halos_df.loc[mask]
 
-    logging.info(f"Found {len(candidates)} candidates after physical cuts.")
+    logging.info(f"Candidates after Virgo + bulk-flow cuts: {len(candidates)}")
 
-    # --- rank by closest to zero overdensity ---
+    # --- rank by |delta| and select ---
     selected_points = (
         candidates
         .sort_values(delta_abs_col)
@@ -266,7 +259,7 @@ def main():
 
     logging.info(
         f"Selected {len(selected_points)} origin points "
-        f"(|δ| min={selected_points[delta_abs_col].min():.3e})."
+        f"(min |δ| = {selected_points[delta_abs_col].min():.3e})."
     )
 
     logging.info(f"Selection completed in {time.time() - t0:.2f} s.")
