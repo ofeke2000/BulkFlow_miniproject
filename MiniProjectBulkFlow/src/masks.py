@@ -14,8 +14,6 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
-from specific_utils import periodic_distance
-
 ##################################################################
 # CF4-like mask (halo properties at CF4 positions)
 ##################################################################
