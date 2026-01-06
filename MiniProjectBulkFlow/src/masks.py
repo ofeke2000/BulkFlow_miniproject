@@ -14,99 +14,112 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
+from specific_utils import periodic_distance
+
 ##################################################################
-# CF4-like mask
+# CF4-like mask (halo properties at CF4 positions)
 ##################################################################
 
-def make_cf4_mask(position: np.ndarray,
-                  halos_df: pd.DataFrame,
-                  cf4_df: pd.DataFrame,
-                  tree: cKDTree,
-                  box_size: float = 1000.0,
-                  radius: float = 1.0,
-                  max_doublings: int = 4) -> pd.DataFrame:
+def make_cf4_mask(
+    position: np.ndarray,
+    halos_df: pd.DataFrame,
+    cf4_df: pd.DataFrame,
+    tree: cKDTree,
+    box_size: float = 1000.0,
+    radius: float = 1.0,
+    max_doublings: int = 4
+) -> pd.DataFrame:
     """
-    Create a CF4-like matched sample using a pre-built PeriodicKDTree.
-
-    Parameters
-    ----------
-    tree : MDAnalysis.lib.pkdtree.PeriodicKDTree
-        Pre-built periodic KDTree built from halos_df[['x', 'y', 'z']].
-    halos_df : pandas.DataFrame
-        Simulation halos (must contain ['rockstarid','x','y','z','vx','vy','vz']).
-    cf4_df : pandas.DataFrame
-        CF4 catalog (must contain ['id','x','y','z']).
-    radius : float, optional
-        Initial search radius (h⁻¹ Mpc). Default = 1.0
-    max_doublings : int, optional
-        Number of times to double search radius upon failure.
+    Create a CF4-like matched sample:
+    - match each CF4 galaxy to a Rockstar halo
+    - keep halo properties
+    - overwrite halo position with CF4 position
 
     Returns
     -------
     matched_halos : pandas.DataFrame
-        One matched halo per CF4 object, columns:
-        ['rockstarid','x','y','z','vx','vy','vz','cf4_id','match_distance']
+        Columns include halo properties + CF4 position + match_distance
     """
 
-    cf4_shifted_xyz = cf4_df[['x', 'y', 'z']].values + position # Shift CF4 coordinates
-    cf4_shifted_xyz = np.mod(cf4_shifted_xyz, box_size) # Apply periodic boundaries
+    # Shift CF4 positions to the observer location
+    cf4_shifted_xyz = (cf4_df[['x', 'y', 'z']].values + position) % box_size
+    cf4_ids = cf4_df['id'].values
 
     matched_rows = []
     used_indices = set()
-    search_multiplier = 0
+    match_distances = []
 
-    print(f"Starting CF4-like matching with radius = {radius} h^-1 Mpc...")
+    print(f"Starting CF4-like matching (R0 = {radius} h⁻¹ Mpc)...")
 
     for i, (cf4_id, pos_cf4) in enumerate(
-            zip(cf4_df['id'], cf4_df[['x', 'y', 'z']].values)):
-        
+        zip(cf4_ids, cf4_shifted_xyz)
+    ):
         search_radius = radius
         idx = []
 
-        # Try radius → 2R → 4R → ...
-        for attempt in range(max_doublings + 1):
+        # Try R → 2R → 4R → ...
+        for _ in range(max_doublings + 1):
             idx = tree.query_ball_point(pos_cf4, search_radius)
-
-            search_multiplier += 1
-
-            # Remove halos already matched to earlier CF4 entries
             idx = [j for j in idx if j not in used_indices]
 
             if idx:
-                break  # success
+                break
 
             search_radius *= 2.0
 
         if not idx:
-            continue  # no match after all doublings
+            continue
 
-        # Compute nearest halo
-        halo_positions = halos_df.iloc[idx][['x', 'y', 'z']].values
-        distances = np.linalg.norm(halo_positions - pos_cf4, axis=1)
+        # --- compute periodic distances ---
+        halo_pos = halos_df.iloc[idx][['x', 'y', 'z']].values
+        delta = halo_pos - pos_cf4
+        delta -= box_size * np.round(delta / box_size)
+        distances = np.linalg.norm(delta, axis=1)
 
         j_closest = idx[np.argmin(distances)]
-        used_indices.add(j_closest)
+        d_min = distances.min()
 
-        # Store result
-        row = halos_df.iloc[j_closest].copy()
+        used_indices.add(j_closest)
+        match_distances.append(d_min)
+
+        halo = halos_df.iloc[j_closest]
+
+        # --- IMPORTANT PART ---
+        # Keep halo properties, but place at CF4 position
         matched_rows.append({
-            'rockstarid': row['rockstarid'],
-            'x': row['x'],
-            'y': row['y'],
-            'z': row['z'],
-            'vx': row['vx'],
-            'vy': row['vy'],
-            'vz': row['vz'],
+            'rockstarid': halo['rockstarid'],
+            'x': pos_cf4[0],
+            'y': pos_cf4[1],
+            'z': pos_cf4[2],
+            'vx': halo['vx'],
+            'vy': halo['vy'],
+            'vz': halo['vz'],
+            'mvir': halo.get('mvir', np.nan),
             'cf4_id': cf4_id,
-            'match_distance': distances.min()
+            'match_distance': d_min
         })
 
         if (i + 1) % 10_000 == 0:
-            print(f"  Matched {i+1:,}/{len(cf4_df):,} with mean search multiplier {search_multiplier/(i+1)}.")
+            print(f"  Matched {i+1:,}/{len(cf4_df):,}")
 
     matched_halos = pd.DataFrame(matched_rows)
-    print(f"Matched {len(matched_halos):,} CF4 groups to halos.")
+
+    # ---------------------------------------------------
+    # Diagnostics
+    # ---------------------------------------------------
+    if match_distances:
+        mean_d = np.mean(match_distances)
+        median_d = np.median(match_distances)
+
+        print("\nCF4–Rockstar matching statistics:")
+        print(f"  Mean distance   = {mean_d:.3f} h⁻¹ Mpc")
+        print(f"  Median distance = {median_d:.3f} h⁻¹ Mpc")
+        print(f"  Max distance    = {np.max(match_distances):.3f} h⁻¹ Mpc")
+
+    print(f"\nMatched {len(matched_halos):,} CF4 galaxies to halos.")
+
     return matched_halos
+
 
 ##################################################################################
 # Uniform mask

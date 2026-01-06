@@ -16,6 +16,41 @@ def weighted_average(values, weights):
 # Periodic distance computations
 # ================================================================
 
+def periodic_distance(
+    p1: np.ndarray,
+    p2: np.ndarray,
+    box_size: float
+) -> float:
+    """
+    Compute periodic (minimum-image) distance between two points.
+
+    Parameters
+    ----------
+    p1, p2 : array-like, shape (3,)
+        Cartesian coordinates of the two points.
+    box_size : float
+        Size of the periodic box.
+
+    Returns
+    -------
+    float
+        Periodic Euclidean distance between p1 and p2.
+    """
+
+    p1 = np.asarray(p1)
+    p2 = np.asarray(p2)
+
+    if p1.shape != (3,) or p2.shape != (3,):
+        raise ValueError("p1 and p2 must be 3-element vectors")
+
+    # Displacement
+    d = p1 - p2
+
+    # Minimum-image convention
+    d -= box_size * np.round(d / box_size)
+
+    return np.linalg.norm(d)
+
 def add_periodic_distance(
     df: pd.DataFrame,
     origin: np.ndarray,
