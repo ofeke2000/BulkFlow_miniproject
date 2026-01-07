@@ -22,58 +22,96 @@ def plot_bulkflow_from_hdf5(
     hdf_file: str,
     output_folder: str,
     key: str = "bulkflow",
-    output_file: str = "bulkflow_vs_radius.png"
+    output_file: str = "bulkflow_vs_radius_mean.png"
 ) -> None:
     """
-    Load bulk flow results from an HDF5 file and plot U_total vs radius
-    for CF4 and uniform masks.
+    Load bulk flow results from an HDF5 file and plot mean U_total vs radius
+    for CF4 and theoretical (uniform) masks.
 
     Parameters
     ----------
     hdf_file : str
         Path to the HDF5 file.
+    output_folder : str
+        Folder to save the output plot.
     key : str
         HDF5 key containing the bulk flow DataFrame.
     output_file : str
         Output filename for the plot.
-    show_bulkflow_plot : bool
-        Whether to generate the plot.
     """
 
-    # Load the HDF5 results
+    # --------------------------------------------------
+    # Load data
+    # --------------------------------------------------
     df = pd.read_hdf(hdf_file, key=key)
 
     # Separate masks
     cf4_df = df[df["mask"] == "cf4"]
     uniform_df = df[df["mask"] == "uniform"]
 
-    # Log the number of points
-    logging.info(f"Number of points for CF4 mask: {len(cf4_df)}")
-    logging.info(f"Number of points for uniform mask: {len(uniform_df)}")
+    # --------------------------------------------------
+    # Average over identical radii
+    # --------------------------------------------------
+    cf4_mean = (
+        cf4_df
+        .groupby("radius", as_index=False)
+        .agg(U_total_mean=("U_total", "mean"))
+        .sort_values("radius")
+    )
 
-    # Log U_total values
-    logging.info(f"CF4 U_total values: {cf4_df['U_total'].values}")
-    logging.info(f"Uniform U_total values: {uniform_df['U_total'].values}")
+    uniform_mean = (
+        uniform_df
+        .groupby("radius", as_index=False)
+        .agg(U_total_mean=("U_total", "mean"))
+        .sort_values("radius")
+    )
 
-    # Plotting
+    # --------------------------------------------------
+    # Logging (important sanity check)
+    # --------------------------------------------------
+    logging.info(
+        f"CF4 radii: {len(cf4_mean)} unique values "
+        f"(from {len(cf4_df)} total rows)"
+    )
+    logging.info(
+        f"Uniform radii: {len(uniform_mean)} unique values "
+        f"(from {len(uniform_df)} total rows)"
+    )
+
+    # --------------------------------------------------
+    # Plot
+    # --------------------------------------------------
     plt.figure(figsize=(8, 5))
-    plt.plot(cf4_df["radius"], cf4_df["U_total"],
-             marker='o', label='CF4 Mask')
-    plt.plot(uniform_df["radius"], uniform_df["U_total"],
-             marker='s', label='Uniform Mask')
+
+    plt.plot(
+        cf4_mean["radius"],
+        cf4_mean["U_total_mean"],
+        marker="o",
+        label="CF4 (mean)"
+    )
+
+    plt.plot(
+        uniform_mean["radius"],
+        uniform_mean["U_total_mean"],
+        marker="s",
+        label="Uniform (mean)"
+    )
 
     plt.xlabel("Radius [h⁻¹ Mpc]")
-    plt.ylabel("Average U_total [km/s]")
-    plt.title("Average Bulk Flow vs Radius")
+    plt.ylabel("⟨U_total⟩ [km/s]")
+    plt.title("Mean Bulk Flow vs Radius")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
 
-    # Ensure output folder exists and save plot there
+    # --------------------------------------------------
+    # Save
+    # --------------------------------------------------
     os.makedirs(output_folder, exist_ok=True)
     output_path = os.path.join(output_folder, output_file)
     plt.savefig(output_path, dpi=150)
     plt.close()
+
 
 def plot_distance_histogram(
         data_df, 
