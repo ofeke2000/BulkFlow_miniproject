@@ -6,27 +6,22 @@ import logging
 
 #reference line "from .data_loader import load_cf4_catalogue"
 from .specific_utils import add_periodic_distance
+from theoretical_bulkflow import theoretical_bulkflow_colossus
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-# Path to your HDF5 file
-hdf_file = "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/bulkflow_results_max250_min_50_jump25_points5.h5"
-cf4_catalog = "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
-
-show_bulkflow_plot = True
-show_CF4_Histogram = False
-
 
 def plot_bulkflow_from_hdf5(
     hdf_file: str,
     output_folder: str,
     key: str = "bulkflow",
-    output_file: str = "bulkflow_vs_radius_mean.png"
+    output_file: str = "bulkflow_vs_radius_mean.png",
+    plot_theory: bool = True,
+    use_mean_amplitude: bool = True
 ) -> None:
     """
     Load bulk flow results from an HDF5 file and plot mean U_total vs radius
-    for CF4 and theoretical (uniform) masks.
+    for CF4, uniform simulation, and ΛCDM theory (Colossus).
 
     Parameters
     ----------
@@ -38,6 +33,10 @@ def plot_bulkflow_from_hdf5(
         HDF5 key containing the bulk flow DataFrame.
     output_file : str
         Output filename for the plot.
+    plot_theory : bool
+        Whether to plot ΛCDM theoretical prediction.
+    use_mean_amplitude : bool
+        If True, convert σ_v → ⟨|U|⟩ using Maxwellian expectation.
     """
 
     # --------------------------------------------------
@@ -66,6 +65,23 @@ def plot_bulkflow_from_hdf5(
         .sort_values("radius")
     )
 
+    # -----------------------------
+    # Theory
+    # -----------------------------
+    if plot_theory:
+
+        radii = cf4_mean["radius"].values  # h⁻¹ Mpc
+        sigma_v = theoretical_bulkflow_colossus(
+            radii=radii,
+        )  # km/s, RMS per component
+
+        if use_mean_amplitude:
+            U_theory = np.sqrt(8 / (3 * np.pi)) * sigma_v
+            theory_label = r"$\Lambda$CDM $\langle |U| \rangle$ (Colossus)"
+        else:
+            U_theory = sigma_v
+            theory_label = r"$\Lambda$CDM $\sigma_v$ (Colossus)"
+
     # --------------------------------------------------
     # Logging (important sanity check)
     # --------------------------------------------------
@@ -77,6 +93,8 @@ def plot_bulkflow_from_hdf5(
         f"Uniform radii: {len(uniform_mean)} unique values "
         f"(from {len(uniform_df)} total rows)"
     )
+    if plot_theory:
+        logging.info(f"Theoretical radii: {len(radii)} values")
 
     # --------------------------------------------------
     # Plot
@@ -97,8 +115,17 @@ def plot_bulkflow_from_hdf5(
         label="Uniform (mean)"
     )
 
-    plt.xlabel("Radius [h⁻¹ Mpc]")
-    plt.ylabel("⟨U_total⟩ [km/s]")
+    if plot_theory:
+        plt.plot(
+            radii,
+            U_theory,
+            "--",
+            linewidth=2,
+            label=theory_label,
+        )
+
+    plt.xlabel(r"Radius [$h^{-1}$ Mpc]")
+    plt.ylabel(r"$\langle |U| \rangle$ [km/s]")
     plt.title("Mean Bulk Flow vs Radius")
     plt.legend()
     plt.grid(True)
