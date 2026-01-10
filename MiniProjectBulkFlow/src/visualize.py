@@ -6,7 +6,7 @@ import logging
 
 #reference line "from .data_loader import load_cf4_catalogue"
 from .specific_utils import add_periodic_distance
-from theoretical_bulkflow import theoretical_bulkflow_colossus
+from .theoretical_bulkflow import theoretical_bulkflow_colossus
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
