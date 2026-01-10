@@ -371,6 +371,7 @@ def main():
         )
 
         logging.info(f" Results appended to {output_file}.")
+        logging.info(f" Done {idx + 1} of {len(selected_points)} origins.")
 
         per_origin_times.append(time.time() - t_origin)
 

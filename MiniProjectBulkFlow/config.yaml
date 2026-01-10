@@ -9,7 +9,7 @@ paths:
   rockstar_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv" 
   cf4_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
   output_folder: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/"
-  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/Advanced_test_5_points.h5"
+  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/bulkflow_max250_min50_jumps5_origins50.h5"
 
 columns:
   - rockstarid
