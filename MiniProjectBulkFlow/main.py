@@ -382,7 +382,9 @@ def main():
         hdf_file=output_file,
         output_folder=output_folder,
         key="bulkflow",
-        output_file="bulkflow_vs_radius.png"
+        output_file="bulkflow_vs_radius.png",
+        plot_theory=True,
+        use_mean_amplitude=True
     )
 
     timings["process_all_origins"] = time.time() - t0
