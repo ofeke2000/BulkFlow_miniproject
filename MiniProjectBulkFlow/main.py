@@ -14,7 +14,7 @@ from src.overdensity import compute_overdensity
 from src.masks import make_cf4_mask, make_uniform_mask
 from src.bulkflow import calculate_bulk_flow_series, calculate_local_bulkflow
 from src.specific_utils import append_bulkflow_results
-from src.visualize import plot_bulkflow_from_hdf5, plot_distance_histogram
+from MiniProjectBulkFlow.visualize import plot_bulkflow_from_hdf5, plot_distance_histogram
 from src.near_virgo import near_virgo
 
 
@@ -65,7 +65,7 @@ def main():
     Hubble_Parameter = cfg["MDPL2"]["HubbleParameter"]
     radius_overdensity = int(cfg["origin_configs"]["overdensity_radius"])
     radius_bulkflow = int(cfg["origin_configs"]["bulkflow_radius"])
-    n_lowest = cfg["origin_configs"]["number_of_origins"]
+    n_origins = cfg["origin_configs"]["number_of_origins"]
 
     # bulkflow config
     r_min = int(cfg["bulkflow"]["min_radius"])
@@ -254,7 +254,7 @@ def main():
     selected_points = (
         candidates
         .sort_values(delta_abs_col)
-        .head(n_lowest)
+        .head(n_origins)
     )
 
     logging.info(
@@ -270,12 +270,26 @@ def main():
     # ===========================================
     per_origin_times = []
     t0 = time.time()
+    i=0
 
-    for idx, row in selected_points.iterrows():
+    for _, row in selected_points.iterrows():
+
         origin = (row["x"], row["y"], row["z"])
         origin_id = int(row["rockstarid"])
 
         logging.info(f"Processing origin ID {origin_id} at {origin}")
+
+        i += 1
+
+        if i > 2:
+            avg_time = np.mean(per_origin_times)
+            eta = avg_time * (n_origins - i)
+            logging.info(
+                f"=== Processing origin {i}/{n_origins} "
+                f"({100*i/n_origins:.1f}%), ETA ~ {eta/60:.1f} min ==="
+            )
+        else:
+            logging.info(f"=== Processing origin {i}/{n_origins} ===")
 
         # ---------------------------------------
         # 6.1 Make masks
@@ -371,7 +385,6 @@ def main():
         )
 
         logging.info(f" Results appended to {output_file}.")
-        logging.info(f" Done {idx + 1} of {len(selected_points)} origins.")
 
         per_origin_times.append(time.time() - t_origin)
 
@@ -383,9 +396,10 @@ def main():
         hdf_file=output_file,
         output_folder=output_folder,
         key="bulkflow",
-        output_file="bulkflow_vs_radius.png",
+        output_file=f"bulkflow_vs_radius_{n_origins}_points.png",
         plot_theory=True,
-        use_mean_amplitude=True
+        use_mean_amplitude=True,
+        plot_variance_band=True,
     )
 
     timings["process_all_origins"] = time.time() - t0
