@@ -46,7 +46,9 @@ def visualize (plot_bulkflow: bool = False,
             plot_theory=True,
             use_mean_amplitude=True,
             plot_variance_band=True,
-            variance_alpha=0.25
+            variance_alpha=0.25,
+            plot_all_curves=False,
+            show_markers=True,
         )
 
 
@@ -207,16 +209,17 @@ def plot_bulkflow_from_hdf5(
 
 
 
-def plot_distance_histogram(
+def plot_histogram(
         data_df, 
         output_folder="plots", 
         output_file="cf4_histogram_lin.png", 
+        key="distance",
         origin=(0,0,0),
         bins=50
         ):
 
     #Check for 'distance' column; calculate if missing
-    if "distance" not in data_df.columns:
+    if key == "distance" and key not in data_df.columns:
         if all(col in data_df.columns for col in ["x", "y", "z"]):
             # Distance formula: sqrt(x^2 + y^2 + z^2)
             data_df = add_periodic_distance(
@@ -230,9 +233,9 @@ def plot_distance_histogram(
 
     #Plotting
     plt.figure(figsize=(10, 6))
-    plt.hist(data_df["distance"], bins=bins)
+    plt.hist(data_df[key], bins=bins)
     
-    plt.xlabel("Distance")
+    plt.xlabel(key.replace("_", " ").capitalize())
     plt.ylabel("Number of Objects")
     plt.title(output_file.replace("_", " ").replace(".png", ""))
     plt.grid(True, linestyle='--', alpha=0.7)
@@ -248,6 +251,6 @@ def plot_distance_histogram(
 # ------------------------------------------------------
 # Entry point
 # ------------------------------------------------------
-if __name__ == "__visualise__":
+if __name__ == "__main__":
     plot_bulkflow = True
     visualize(plot_bulkflow= plot_bulkflow)

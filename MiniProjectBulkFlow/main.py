@@ -14,7 +14,7 @@ from src.overdensity import compute_overdensity
 from src.masks import make_cf4_mask, make_uniform_mask
 from src.bulkflow import calculate_bulk_flow_series, calculate_local_bulkflow
 from src.specific_utils import append_bulkflow_results
-from MiniProjectBulkFlow.visualize import plot_bulkflow_from_hdf5, plot_distance_histogram
+from MiniProjectBulkFlow.visualize import plot_bulkflow_from_hdf5, plot_histogram
 from src.near_virgo import near_virgo
 
 
@@ -91,10 +91,12 @@ def main():
     logging.info("Loading CF4 catalog...")
     cf4_df = load_cf4_catalogue(cf4_path, h=Hubble_Parameter)
 
-    plot_distance_histogram(
+    plot_histogram(
         data_df=halos_df,
         output_folder=output_folder,
         output_file="test_rockstar_histogram_lin.png",
+        origin=(0,0,0),
+        key="distance",
         bins=100
     )
 
@@ -304,10 +306,11 @@ def main():
             max_doublings=5
         )
 
-        plot_distance_histogram(
+        plot_histogram(
             data_df=cf4_mask_df,
             output_folder=output_folder,
             output_file="cf4_mask_histogram_lin.png",
+            key="distance",
             origin=origin,
             bins=50
         )
@@ -320,18 +323,20 @@ def main():
             tree=tree
         )
 
-        plot_distance_histogram(
+        plot_histogram(
             data_df=uniform_mask_df,
             output_folder=output_folder,
             output_file="uniform_mask_histogram_lin.png",
+            key="distance",
             origin=origin,
             bins=50
         )
 
-        plot_distance_histogram(
+        plot_histogram(
         data_df=halos_df,
         output_folder=output_folder,
         output_file="test_rockstar_histogram_near_origin_lin.png",
+        key="distance",
         origin=origin,
         bins=50
         )

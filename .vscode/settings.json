@@ -6,5 +6,12 @@
     "vscode-pets.petSize": "small",
     "vscode-pokemon.pokemonSize": "medium",
     "vscode-pets.throwBallWithMouse": false,
-    "vscode-pets.position": "explorer"
+    "vscode-pets.position": "explorer",
+    "cSpell.words": [
+        "bulkflow",
+        "Msun",
+        "Overdensity",
+        "Rockstar",
+        "rockstarid"
+    ]
 }
