@@ -9,7 +9,7 @@ paths:
   rockstar_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv" 
   cf4_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
   output_folder: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/"
-  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/bulkflow_max250_min50_jumps1_origins10.h5"
+  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/bulkflow_max250_min50_jumps5_origins50_mvir_e12.h5"
 
 columns:
   - rockstarid
@@ -24,12 +24,13 @@ columns:
 origin_configs:
   overdensity_radius: 3.0    # h^-1 Mpc
   bulkflow_radius: 3.0     # h^-1 Mpc
-  number_of_origins: 10
+  number_of_origins: 50
+  mass_cut: 1e12                # h^-1 Msun
 
 bulkflow:
   max_radius: 250.0          # h^-1 Mpc
   min_radius: 50.0           # h^-1 Mpc
-  radii_step: 1.0           # h^-1 Mpc
+  radii_step: 5.0           # h^-1 Mpc
   error_fraction: 0.2        # 20%
   sigma_star: 250.0          # km/s
   sigma_min: 50.0            # km/s

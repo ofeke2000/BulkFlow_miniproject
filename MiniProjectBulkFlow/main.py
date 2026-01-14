@@ -14,7 +14,7 @@ from src.overdensity import compute_overdensity
 from src.masks import make_cf4_mask, make_uniform_mask
 from src.bulkflow import calculate_bulk_flow_series, calculate_local_bulkflow
 from src.specific_utils import append_bulkflow_results
-from MiniProjectBulkFlow.visualize import plot_bulkflow_from_hdf5, plot_histogram
+from src.visualize import plot_bulkflow_from_hdf5, plot_histogram, plot_simulation_slice_heatmap
 from src.near_virgo import near_virgo
 
 
@@ -65,6 +65,7 @@ def main():
     Hubble_Parameter = cfg["MDPL2"]["HubbleParameter"]
     radius_overdensity = int(cfg["origin_configs"]["overdensity_radius"])
     radius_bulkflow = int(cfg["origin_configs"]["bulkflow_radius"])
+    mass_cut = float(cfg["origin_configs"]["mass_cut"])
     n_origins = cfg["origin_configs"]["number_of_origins"]
 
     # bulkflow config
@@ -89,29 +90,51 @@ def main():
     logging.info("Rockstar catalog loaded and prepared.")
 
     logging.info("Loading CF4 catalog...")
-    cf4_df = load_cf4_catalogue(cf4_path, h=Hubble_Parameter)
-
-    plot_histogram(
-        data_df=halos_df,
-        output_folder=output_folder,
-        output_file="test_rockstar_histogram_lin.png",
-        origin=(0,0,0),
-        key="distance",
-        bins=100
-    )
+    # cf4_df = load_cf4_catalogue(cf4_path, h=Hubble_Parameter)
 
     # -------------------------------------------
     # Filter CF4 galaxies inside r_max
     # -------------------------------------------
-    n_before = len(cf4_df)
+    # n_before = len(cf4_df)
 
-    cf4_df = cf4_df[cf4_df["distance"] <= r_max].copy()
+    # cf4_df = cf4_df[cf4_df["distance"] <= r_max].copy()
 
-    n_after = len(cf4_df)
+    # n_after = len(cf4_df)
+
+    # logging.info(
+    #     f"Filtered CF4 catalogue to r <= {r_max:.1f} : "
+    #     f"{n_before} → {n_after} galaxies"
+    # )
+
+    # -------------------------------------------
+    # Mass cut
+    # -------------------------------------------
+
+    mass_order = np.log10(mass_cut)
+
+    logging.info(f"Applying mass cut: mvir >= {mass_order:.2e}")
+
+    n_before = len(halos_df)
+
+    halos_df = halos_df[halos_df["mvir"] >= mass_cut].copy()
+
+    n_after = len(halos_df)
 
     logging.info(
-        f"Filtered CF4 catalogue to r <= {r_max:.1f} : "
-        f"{n_before} → {n_after} galaxies"
+        f"Mass cut applied: {n_before} → {n_after} halos "
+    )
+
+    plot_simulation_slice_heatmap(
+        df=halos_df,
+        slice_axis="z",
+        slice_min = 400.0,
+        slice_max = 500.0,
+        proj_axes = ("x", "y"),
+        gridsize = 500,
+        cmap = "magma",
+        output_folder = output_folder,
+        output_file = f"simulation_slice_heatmap_m={mass_order}.png",
+        dpi= 300,
     )
 
     # ===========================================
@@ -250,7 +273,7 @@ def main():
 
     candidates = halos_df.loc[mask]
 
-    logging.info(f"Candidates after Virgo + bulk-flow cuts: {len(candidates)}")
+    logging.info(f"Candidates after mass + Virgo + bulk-flow cuts: {len(candidates)}")
 
     # --- rank by |delta| and select ---
     selected_points = (
@@ -296,59 +319,60 @@ def main():
         # ---------------------------------------
         # 6.1 Make masks
         # ---------------------------------------
-        cf4_mask_df = make_cf4_mask(
-            position=np.array(origin),
-            halos_df=halos_df,
-            cf4_df=cf4_df,
-            tree=tree,
-            box_size=box_size,
-            radius=5.0,
-            max_doublings=5
-        )
+        # cf4_mask_df = make_cf4_mask(
+        #     position=np.array(origin),
+        #     halos_df=halos_df,
+        #     cf4_df=cf4_df,
+        #     tree=tree,
+        #     box_size=box_size,
+        #     radius=5.0,
+        #     max_doublings=5
+        # )
 
-        plot_histogram(
-            data_df=cf4_mask_df,
-            output_folder=output_folder,
-            output_file="cf4_mask_histogram_lin.png",
-            key="distance",
-            origin=origin,
-            bins=50
-        )
+        # uniform_mask_df = make_uniform_mask(
+        #     position=np.array(origin),
+        #     radius=r_max,
+        #     df_halos=halos_df,
+        #     CF4_catalogue=cf4_df,
+        #     tree=tree
+        # )
 
-        uniform_mask_df = make_uniform_mask(
-            position=np.array(origin),
-            radius=r_max,
-            df_halos=halos_df,
-            CF4_catalogue=cf4_df,
-            tree=tree
+        idx_full = tree.query_ball_point(
+            np.array(origin),
+            r=r_max
         )
-
-        plot_histogram(
-            data_df=uniform_mask_df,
-            output_folder=output_folder,
-            output_file="uniform_mask_histogram_lin.png",
-            key="distance",
-            origin=origin,
-            bins=50
-        )
-
-        plot_histogram(
-        data_df=halos_df,
-        output_folder=output_folder,
-        output_file="test_rockstar_histogram_near_origin_lin.png",
-        key="distance",
-        origin=origin,
-        bins=50
-        )
+        full_mask_df = halos_df.iloc[idx_full].copy()
 
         t_origin = time.time()
-        logging.info(f" Masks created. CF4 mask size: {len(cf4_mask_df)}, Uniform mask size: {len(uniform_mask_df)}")
+        # logging.info(f" Masks created. CF4 mask size: {len(cf4_mask_df)}, Uniform mask size: {len(uniform_mask_df)}")
 
         # ---------------------------------------
         # 6.2 Compute bulk flow for each mask
         # ---------------------------------------
-        bf_cf4 = calculate_bulk_flow_series(
-            halos_df=cf4_mask_df,
+        # bf_cf4 = calculate_bulk_flow_series(
+        #     halos_df=cf4_mask_df,
+        #     origin=origin,
+        #     r_max=r_max,
+        #     r_min=r_min,
+        #     r_jumps=r_jump,
+        #     error_frac=error_frac,
+        #     sigma_star=sigma_star,
+        #     sigma_min=sigma_min
+        # )
+
+        # bf_uniform = calculate_bulk_flow_series(
+        #     halos_df=uniform_mask_df,
+        #     origin=origin,
+        #     r_max=r_max,
+        #     r_min=r_min,
+        #     r_jumps=r_jump,
+        #     error_frac=error_frac,
+        #     sigma_star=sigma_star,
+        #     sigma_min=sigma_min
+        # )
+
+        bf_full = calculate_bulk_flow_series(
+            halos_df=full_mask_df,
             origin=origin,
             r_max=r_max,
             r_min=r_min,
@@ -358,34 +382,31 @@ def main():
             sigma_min=sigma_min
         )
 
-        bf_uniform = calculate_bulk_flow_series(
-            halos_df=uniform_mask_df,
-            origin=origin,
-            r_max=r_max,
-            r_min=r_min,
-            r_jumps=r_jump,
-            error_frac=error_frac,
-            sigma_star=sigma_star,
-            sigma_min=sigma_min
-        )
 
-        logging.info(f" Bulk flows computed. CF4 bulk flow size: {len(bf_cf4)}, Uniform bulk flow size: {len(bf_uniform)}")
-        logging.info(f" Bulk flow is {bf_cf4['U_total'].iloc[-1]}")
+        # logging.info(f" Bulk flows computed. CF4 bulk flow size: {len(bf_cf4)}, Uniform bulk flow size: {len(bf_uniform)}")
+        # logging.info(f" Bulk flow is {bf_cf4['U_total'].iloc[-1]}")
 
         # ---------------------------------------
         # 6.3 Save results
         # ---------------------------------------
-        append_bulkflow_results(
-            bf_cf4,
-            origin_id=origin_id,
-            mask_name="cf4",
-            filename=output_file
-        )
+        # append_bulkflow_results(
+        #     bf_cf4,
+        #     origin_id=origin_id,
+        #     mask_name="cf4",
+        #     filename=output_file
+        # )
+
+        # append_bulkflow_results(
+        #     bf_uniform,
+        #     origin_id=origin_id,
+        #     mask_name="uniform",
+        #     filename=output_file
+        # )
 
         append_bulkflow_results(
-            bf_uniform,
+            bf_full,
             origin_id=origin_id,
-            mask_name="uniform",
+            mask_name="full",
             filename=output_file
         )
 
@@ -401,10 +422,11 @@ def main():
         hdf_file=output_file,
         output_folder=output_folder,
         key="bulkflow",
-        output_file=f"bulkflow_vs_radius_{n_origins}_points.png",
+        output_file=f"bulkflow_vs_radius_{n_origins}_points_mass_{mass_order}.png",
         plot_theory=True,
         use_mean_amplitude=True,
         plot_variance_band=True,
+        show_markers=False
     )
 
     timings["process_all_origins"] = time.time() - t0

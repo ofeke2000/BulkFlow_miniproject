@@ -96,31 +96,3 @@ def compute_overdensity(
     # --- Store result ---
     df[delta_col] = overdensity
     return df
-
-
-################################################################
-# NOT IN USE
-################################################################
-
-def merge_overdensity(df_original: pd.DataFrame, df_delta: pd.DataFrame, radius: float = 5.0) -> pd.DataFrame:  
-    """
-    Merge overdensity results into the original halo catalog.
-
-    Parameters
-    ----------
-    df_original : pandas.DataFrame
-        Original halo catalog.
-    df_delta : pandas.DataFrame
-        DataFrame from compute_overdensity().
-    radius : float
-        Radius of overdensity computation (used for column name).
-
-    Returns
-    -------
-    merged : pandas.DataFrame
-        Catalog with new column delta_<radius>.
-    """
-    delta_col = f'delta_{int(radius)}'
-    merged = df_original.merge(df_delta, on='rockstarid', how='left')
-    print(f"Added column '{delta_col}' to catalog.")
-    return merged
