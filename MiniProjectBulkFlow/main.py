@@ -17,7 +17,6 @@ from src.specific_utils import append_bulkflow_results
 from src.visualize import plot_bulkflow_from_hdf5, plot_histogram, plot_simulation_slice_heatmap
 from src.near_virgo import near_virgo
 
-
 # ------------------------------------------------------
 # Setup logging
 # ------------------------------------------------------
@@ -27,7 +26,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 
-
 # ------------------------------------------------------
 # Load YAML configuration
 # ------------------------------------------------------
@@ -35,7 +33,6 @@ def load_config(path: str = "config.yaml") -> dict:
     logging.info(f"Loading config from {path}")
     with open(path, "r") as f:
         return yaml.safe_load(f)
-
 
 # ------------------------------------------------------
 # Main workflow
@@ -48,7 +45,6 @@ def main():
     timings = {}
 
     t0_total = time.time()
-
 
     # ===========================================
     # 1. Load configuration
@@ -63,10 +59,18 @@ def main():
 
     box_size = cfg["MDPL2"]["box_size"]
     Hubble_Parameter = cfg["MDPL2"]["HubbleParameter"]
-    radius_overdensity = int(cfg["origin_configs"]["overdensity_radius"])
-    radius_bulkflow = int(cfg["origin_configs"]["bulkflow_radius"])
+    radius_overdensity = int(cfg["origin_configs"]["local_overdensity_radius"])
+    overdensity_upper_cut = float(cfg["origin_configs"]["local_overdensity_upper_cut"])
+    overdensity_lower_cut = float(cfg["origin_configs"]["local_overdensity_lower_cut"])
+    radius_bulkflow = int(cfg["origin_configs"]["local_bulkflow_radius"])
+    bulkflow_upper_cut = float(cfg["origin_configs"]["local_bulkflow_upper_cut"])
+    bulkflow_lower_cut = float(cfg["origin_configs"]["local_bulkflow_lower_cut"])
+    use_virgo_criteria = cfg["origin_configs"]["use_virgo_criteria"]
     mass_cut = float(cfg["origin_configs"]["mass_cut"])
+    mass_cut_bool = cfg["origin_configs"]["mass_cut_bool"]
     n_origins = cfg["origin_configs"]["number_of_origins"]
+    lowest_delta = cfg["origin_configs"]["select_lowest_delta"]
+    select_random = cfg["origin_configs"]["select_random"]
 
     # bulkflow config
     r_min = int(cfg["bulkflow"]["min_radius"])
@@ -106,36 +110,39 @@ def main():
     #     f"{n_before} → {n_after} galaxies"
     # )
 
+    
     # -------------------------------------------
     # Mass cut
     # -------------------------------------------
 
-    mass_order = np.log10(mass_cut)
+    if mass_cut_bool:
 
-    logging.info(f"Applying mass cut: mvir >= {mass_order:.2e}")
+        mass_order = np.log10(mass_cut)
 
-    n_before = len(halos_df)
+        logging.info(f"Applying mass cut: mvir >= {mass_order:.2e}")
 
-    halos_df = halos_df[halos_df["mvir"] >= mass_cut].copy()
+        n_before = len(halos_df)
 
-    n_after = len(halos_df)
+        halos_df = halos_df[halos_df["mvir"] >= mass_cut].copy()
 
-    logging.info(
-        f"Mass cut applied: {n_before} → {n_after} halos "
-    )
+        n_after = len(halos_df)
 
-    plot_simulation_slice_heatmap(
-        df=halos_df,
-        slice_axis="z",
-        slice_min = 400.0,
-        slice_max = 500.0,
-        proj_axes = ("x", "y"),
-        gridsize = 500,
-        cmap = "magma",
-        output_folder = output_folder,
-        output_file = f"simulation_slice_heatmap_m={mass_order}.png",
-        dpi= 300,
-    )
+        logging.info(
+            f"Mass cut applied: {n_before} → {n_after} halos "
+        )
+
+        plot_simulation_slice_heatmap(
+            df=halos_df,
+            slice_axis="z",
+            slice_min = 400.0,
+            slice_max = 500.0,
+            proj_axes = ("x", "y"),
+            gridsize = 500,
+            cmap = "magma",
+            output_folder = output_folder,
+            output_file = f"simulation_slice_heatmap_m={mass_order}.png",
+            dpi= 300,
+        )
 
     # ===========================================
     # 3. Build cKDTree
@@ -254,7 +261,6 @@ def main():
         )
         
 
-
     # ===========================================
     # 5. Select Virgo-like, quiet overdensity, proper bulk flow
     # ===========================================
@@ -267,20 +273,54 @@ def main():
 
     # --- physical filters only ---
     mask = (
-        (halos_df[bulkflow_column].between(400.0, 600.0)) &
-        (halos_df[virgo_column] > 0)
+        # (halos_df["mvir"] >= mass_cut) &
+        (halos_df[delta_column].between(overdensity_lower_cut, overdensity_upper_cut)) #&
+        # (halos_df[bulkflow_column].between(bulkflow_lower_cut, bulkflow_upper_cut)) &
+        # (halos_df[virgo_column] > 0)
     )
 
     candidates = halos_df.loc[mask]
+    candidates_df = halos_df.loc[candidates.index].copy()
 
-    logging.info(f"Candidates after mass + Virgo + bulk-flow cuts: {len(candidates)}")
+    plot_histogram(
+        data_df=candidates_df, 
+        output_folder=output_folder, 
+        output_file=f"overdensity_histogram_[{overdensity_lower_cut},{overdensity_upper_cut}]_for_candidates.png", 
+        key=delta_column,
+        origin=(0,0,0),
+        bins=20,
+        log_axis="none"
+        )
 
-    # --- rank by |delta| and select ---
-    selected_points = (
-        candidates
-        .sort_values(delta_abs_col)
-        .head(n_origins)
-    )
+    logging.info(f"Candidates after cuts: {len(candidates)}")
+
+    if lowest_delta:
+        # --- rank by |delta| and select ---
+        selected_points = (
+            candidates
+            .sort_values(delta_abs_col)
+            .head(n_origins)
+        )
+    elif select_random:
+        selected_points = candidates.sample(
+            n=min(n_origins, len(candidates)),
+            replace=False
+        )
+
+
+    selected_df = halos_df.loc[selected_points.index].copy()
+    logging.info(f"Selected halo sample size: {len(selected_df)}")
+
+
+    plot_histogram(
+        data_df=selected_df, 
+        output_folder=output_folder, 
+        output_file=f"overdensity_histogram_[{overdensity_lower_cut},{overdensity_upper_cut}]_for_selected_points.png", 
+        key=delta_column,
+        origin=(0,0,0),
+        bins=20,
+        log_axis= "none"
+        )
 
     logging.info(
         f"Selected {len(selected_points)} origin points "
@@ -302,19 +342,16 @@ def main():
         origin = (row["x"], row["y"], row["z"])
         origin_id = int(row["rockstarid"])
 
-        logging.info(f"Processing origin ID {origin_id} at {origin}")
-
         i += 1
 
-        if i > 2:
+        if 100*(i/n_origins) % 5 == 0 and i > 1:
+            logging.info(f"Processing origin ID {origin_id} at {origin}")
             avg_time = np.mean(per_origin_times)
             eta = avg_time * (n_origins - i)
             logging.info(
                 f"=== Processing origin {i}/{n_origins} "
                 f"({100*i/n_origins:.1f}%), ETA ~ {eta/60:.1f} min ==="
             )
-        else:
-            logging.info(f"=== Processing origin {i}/{n_origins} ===")
 
         # ---------------------------------------
         # 6.1 Make masks
@@ -410,8 +447,6 @@ def main():
             filename=output_file
         )
 
-        logging.info(f" Results appended to {output_file}.")
-
         per_origin_times.append(time.time() - t_origin)
 
     # ===========================================
@@ -422,11 +457,12 @@ def main():
         hdf_file=output_file,
         output_folder=output_folder,
         key="bulkflow",
-        output_file=f"bulkflow_vs_radius_{n_origins}_points_mass_{mass_order}.png",
+        output_file=f"bulkflow_vs_radius_overdensity_[{overdensity_lower_cut},{overdensity_upper_cut}].png",
         plot_theory=True,
         use_mean_amplitude=True,
         plot_variance_band=True,
-        show_markers=False
+        show_markers=False,
+        plot_all_curves=False
     )
 
     timings["process_all_origins"] = time.time() - t0

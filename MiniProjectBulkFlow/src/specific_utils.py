@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import os
 
+from .theoretical_bulkflow import theoretical_bulkflow_colossus
+
 
 def weighted_average(values, weights):
     """Compute weighted average safely."""
@@ -145,7 +147,7 @@ def radial_velocity_and_error_pbc(
     # Handle halos exactly at the origin
     zero_mask = (r_norm == 0.0)
     if np.any(zero_mask):
-        print(f"Warning: {zero_mask.sum()} halos at origin — adding tiny offset")
+        # print(f"Warning: {zero_mask.sum()} halos at origin — adding tiny offset")
         r_norm[zero_mask] = 1e-8
         disp[zero_mask] += 1e-8
 
@@ -232,3 +234,73 @@ def append_bulkflow_results(
         append=True,
         min_itemsize={"mask": 8}  # set large enough to hold all strings
     )
+
+
+# ================================================================
+# Save bulk flow averages results to csv
+# ================================================================
+
+def save_average_bulkflow_to_csv(
+    hdf_file: str,
+    csv_file: str,
+    column_name: str,
+    mask_type: str = "full",
+    key: str = "bulkflow"
+) -> None:
+    """
+    Calculate mean and std bulk flow per radius (averaged over origins)
+    and store them as band-specific columns in a CSV file.
+    """
+
+    if not os.path.exists(hdf_file):
+        print(f"Error: HDF5 file {hdf_file} not found.")
+        return
+
+    df_hdf = pd.read_hdf(hdf_file, key=key)
+
+    mask_df = df_hdf[df_hdf["mask"] == mask_type]
+
+    if mask_df.empty:
+        print(f"Warning: No data found for mask '{mask_type}' in {hdf_file}.")
+        return
+
+    stats = (
+        mask_df.groupby("radius", as_index=False)
+               .agg(
+                   U_mean=("U_total", "mean"),
+                   U_std=("U_total", "std"),
+               )
+               .sort_values("radius")
+    )
+
+    # Load or create CSV
+    if os.path.exists(csv_file):
+        target_df = pd.read_csv(csv_file)
+    else:
+        print(f"Creating new CSV file: {csv_file}")
+
+        radii = stats["radius"].values
+        target_df = pd.DataFrame({"radius": stats["radius"].values})
+    # Add theoretical columns if not present
+        sigma_v = theoretical_bulkflow_colossus(radii=radii)
+        target_df["U_mean_theory"] = np.sqrt(8 / (3 * np.pi)) * sigma_v
+
+
+    # Rename columns to encode overdensity band
+    stats = stats.rename(
+        columns={
+            "U_mean": f"{column_name}_mean",
+            "U_std":  f"{column_name}_std",
+        }
+    )
+
+    # Drop existing columns if overwriting
+    for col in stats.columns:
+        if col != "radius" and col in target_df.columns:
+            print(f"Warning: Column '{col}' already exists and will be overwritten.")
+            target_df = target_df.drop(columns=[col])
+
+    updated_df = pd.merge(target_df, stats, on="radius", how="left")
+
+    updated_df.to_csv(csv_file, index=False)
+    print(f"Saved band '{column_name}' to {csv_file} (mask={mask_type})")

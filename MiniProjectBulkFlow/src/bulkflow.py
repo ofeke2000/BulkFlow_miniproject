@@ -190,7 +190,7 @@ def calculate_bulk_flow_series(
             min_sigma=sigma_min
         )
     
-    print("[INFO] Radial velocities and errors computed.")
+    # print("[INFO] Radial velocities and errors computed.")
 
     # ---------------------------------------------------------
     # (2) radius list: r_min → r_max in steps of r_jumps
