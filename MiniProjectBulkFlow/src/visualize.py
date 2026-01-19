@@ -539,7 +539,8 @@ def plot_bulkflow_from_csv(
     # --------------------------------------------------
     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cbar = plt.colorbar(sm)
+    ax = plt.gca()
+    cbar = plt.colorbar(sm, ax=ax)
     cbar.set_label(r"Origin overdensity $\delta$")
 
     # --------------------------------------------------
