@@ -101,10 +101,6 @@ def visualize ():
         log_axis="y"
         )
 
-
-
-
-
 def plot_bulkflow_from_hdf5(
     hdf_file: str,
     output_folder: str,
@@ -311,6 +307,7 @@ def plot_histogram(
             raise KeyError(
                 "The dataframe is missing 'distance' and cannot find 'x, y, z' to calculate it."
             )
+    
 
     # Plotting
     plt.figure(figsize=(10, 6))

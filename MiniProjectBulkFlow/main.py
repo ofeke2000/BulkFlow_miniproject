@@ -67,6 +67,7 @@ def main():
     bulkflow_lower_cut = float(cfg["origin_configs"]["local_bulkflow_lower_cut"])
     use_virgo_criteria = cfg["origin_configs"]["use_virgo_criteria"]
     mass_cut = float(cfg["origin_configs"]["mass_cut"])
+    mass_order = np.log10(mass_cut)
     mass_cut_bool = cfg["origin_configs"]["mass_cut_bool"]
     n_origins = cfg["origin_configs"]["number_of_origins"]
     lowest_delta = cfg["origin_configs"]["select_lowest_delta"]
@@ -116,8 +117,6 @@ def main():
     # -------------------------------------------
 
     if mass_cut_bool:
-
-        mass_order = np.log10(mass_cut)
 
         logging.info(f"Applying mass cut: mvir >= {mass_order:.2e}")
 
@@ -273,9 +272,9 @@ def main():
 
     # --- physical filters only ---
     mask = (
-        # (halos_df["mvir"] >= mass_cut) &
-        (halos_df[delta_column].between(overdensity_lower_cut, overdensity_upper_cut)) #&
-        # (halos_df[bulkflow_column].between(bulkflow_lower_cut, bulkflow_upper_cut)) &
+        # (halos_df["mvir"].between(mass_cut, mass_cut * 10)) #&
+        # (halos_df[delta_column].between(overdensity_lower_cut, overdensity_upper_cut)) &
+        (halos_df[bulkflow_column].between(bulkflow_lower_cut, bulkflow_upper_cut)) #&
         # (halos_df[virgo_column] > 0)
     )
 
@@ -285,7 +284,7 @@ def main():
     plot_histogram(
         data_df=candidates_df, 
         output_folder=output_folder, 
-        output_file=f"overdensity_histogram_[{overdensity_lower_cut},{overdensity_upper_cut}]_for_candidates.png", 
+        output_file=f"overdensity_histogram_[{bulkflow_lower_cut:.0f}<local_V<{bulkflow_upper_cut:.0f}]_for_candidates.png", 
         key=delta_column,
         origin=(0,0,0),
         bins=20,
@@ -315,7 +314,7 @@ def main():
     plot_histogram(
         data_df=selected_df, 
         output_folder=output_folder, 
-        output_file=f"overdensity_histogram_[{overdensity_lower_cut},{overdensity_upper_cut}]_for_selected_points.png", 
+        output_file=f"overdensity_histogram_[{bulkflow_lower_cut:.0f}<local_V<{bulkflow_upper_cut:.0f}]_for_selected_points.png", 
         key=delta_column,
         origin=(0,0,0),
         bins=20,
@@ -457,7 +456,7 @@ def main():
         hdf_file=output_file,
         output_folder=output_folder,
         key="bulkflow",
-        output_file=f"bulkflow_vs_radius_overdensity_[{overdensity_lower_cut},{overdensity_upper_cut}].png",
+        output_file=f"bulkflow_vs_radius_local_bulkflow_[{bulkflow_lower_cut:.0f},{bulkflow_upper_cut:.0f}].png",
         plot_theory=True,
         use_mean_amplitude=True,
         plot_variance_band=True,

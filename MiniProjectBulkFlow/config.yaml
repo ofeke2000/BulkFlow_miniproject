@@ -8,8 +8,8 @@ MDPL2:
 paths:
   rockstar_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv" 
   cf4_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
-  output_folder: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/delta_cuts_rmax250_rmin10_jumps5_mcut12/"
-  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/delta_cuts_rmax250_rmin10_jumps5_mcut12/delta_from_0.4_to_0.5_origins_1000.h5"
+  output_folder: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_cuts_rmax250_rmin10_jumps5/"
+  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_cuts_rmax250_rmin10_jumps5/bulkflow_cut_0_to_100.h5"
 
 columns:
   - rockstarid
@@ -26,16 +26,17 @@ origin_configs:
   local_overdensity_upper_cut: 0.5
   local_overdensity_lower_cut: 0.4  
   local_bulkflow_radius: 3.0     # h^-1 Mpc
-  local_bulkflow_upper_cut: 600.0  # km/s
-  local_bulkflow_lower_cut: 400.0    # km/s
+  local_bulkflow_upper_cut: 100.0  # km/s
+  local_bulkflow_lower_cut: 0.0    # km/s
   use_virgo_criteria: true
   number_of_origins: 1000
-  mass_cut: 1e12                # h^-1 Msun
+  mass_cut: 1e14                # h^-1 Msun
   mass_cut_bool: false        # if true, apply mass cut
   select_lowest_delta: false  # if true, select points with lowest |delta|; 
   select_random: true      # if true, select random points from candidates after cuts
 
 bulkflow:
+  masks: "full"            # "full", "cf4", or "uniform"
   max_radius: 250.0          # h^-1 Mpc
   min_radius: 50.0           # h^-1 Mpc
   radii_step: 5.0           # h^-1 Mpc
