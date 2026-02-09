@@ -9,7 +9,7 @@ paths:
   rockstar_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv" 
   cf4_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
   output_folder: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_cuts_rmax250_rmin10_jumps5/"
-  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_cuts_rmax250_rmin10_jumps5/bulkflow_cut_500_to_600.h5"
+  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_cuts_rmax250_rmin10_jumps5/bulkflow_cut_1300_to_1400.h5"
 
 columns:
   - rockstarid
@@ -26,8 +26,8 @@ origin_configs:
   local_overdensity_upper_cut: 0.5
   local_overdensity_lower_cut: 0.4  
   local_bulkflow_radius: 3.0     # h^-1 Mpc
-  local_bulkflow_upper_cut: 600.0  # km/s
-  local_bulkflow_lower_cut: 500.0    # km/s
+  local_bulkflow_upper_cut: 1400.0  # km/s
+  local_bulkflow_lower_cut: 1300.0    # km/s
   use_virgo_criteria: true
   number_of_origins: 1000
   mass_cut: 1e14                # h^-1 Msun
