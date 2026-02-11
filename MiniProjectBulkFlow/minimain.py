@@ -20,13 +20,13 @@ from src.near_virgo import near_virgo
 def main():
     base_dir = os.path.expanduser(
         "~/BulkFlow_miniproject/BulkFlow_miniproject/output/"
-        "delta_cuts_rmax250_rmin10_jumps5_mcut12"
+        "local_bulkflow_cuts_rmax250_rmin10_jumps5"
     )
 
     csv_file = os.path.join(base_dir, "unified_results.csv")
 
     # Define overdensity band edges
-    band_edges = np.arange(-0.5, 0.6, 0.1)  # [-0.5, ..., 0.5]
+    band_edges = np.arange(0, 1600, 100) 
 
     for low, high in zip(band_edges[:-1], band_edges[1:]):
 
@@ -39,21 +39,21 @@ def main():
         band_lo = clean_float(band_lo)
         band_hi = clean_float(band_hi)
 
-        band_dir = f"{band_lo:.1f} to {band_hi:.1f}"
-        band_str = f"{band_lo:.1f}_to_{band_hi:.1f}"
+        band_dir = f"{band_lo:.0f}-{band_hi:.0f}"
+        band_str = f"{band_lo:.0f}_to_{band_hi:.0f}"
 
 
         hdf_file = os.path.join(
             base_dir,
             band_dir,
-            f"delta_from_{band_str}_origins_1000.h5"
+            f"bulkflow_cut_{band_str}.h5"
         )
 
-        column_name = f"V_band_{band_lo:.1f}_to_{band_hi:.1f}"
+        column_name = f"V_band_{band_lo:.0f}_to_{band_hi:.0f}"
 
-        print(f"Processing band {band_lo:.1f} → {band_hi:.1f}")
-        print(f"  HDF5: {hdf_file}")
-        print(f"  Column prefix: {column_name}")
+        print(f"Processing band {band_lo:.0f} → {band_hi:.0f} km/s:")
+        print(f"HDF5: {hdf_file}")
+        print(f"Column prefix: {column_name}")
 
         save_average_bulkflow_to_csv(
             hdf_file=hdf_file,
@@ -66,9 +66,15 @@ def main():
     plot_bulkflow_from_csv(
         csv_file=csv_file,
         output_folder=base_dir,
+        variable_name="local_bulkflow",
+        var_min=0,
+        var_max=1500,
+        var_step=100,
         output_file="bulkflow_comparison.png",
+        plot_theory=True,
+        plot_errors=False,
+        error_alpha=0.25,
         show_markers=False,
-        plot_errors=False
     )
 
 def plot():
@@ -130,8 +136,8 @@ def plot():
 # ------------------------------------------------------
 if __name__ == "__main__":
 
-    if do_main := False:
+    if do_main := True:
         main()
 
-    if do_plot := True:
+    if do_plot := False:
         plot()

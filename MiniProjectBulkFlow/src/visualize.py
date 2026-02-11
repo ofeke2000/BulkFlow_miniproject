@@ -101,6 +101,7 @@ def visualize ():
         log_axis="y"
         )
 
+
 def plot_bulkflow_from_hdf5(
     hdf_file: str,
     output_folder: str,
@@ -283,7 +284,6 @@ def plot_bulkflow_from_hdf5(
     plt.close()
 
 
-
 def plot_histogram(
         data_df, 
         output_folder="plots", 
@@ -438,71 +438,111 @@ def plot_simulation_slice_heatmap(
 #======================================================
 def plot_bulkflow_from_csv(
     csv_file: str,
-    output_folder: str,
-    output_file: str = "bulkflow_vs_radius_overdensity.png",
+    output_folder: str | None = None,
+    variable_name: str = "band",
+    var_min: float | int = 0,
+    var_max: float | int = 1,
+    var_step: float | int = 1,
+    output_file: str | None = None,
     plot_theory: bool = True,
     plot_errors: bool = False,
     error_alpha: float = 0.25,
     show_markers: bool = False,
 ):
     """
-    Plot averaged bulk flow vs radius for multiple origin overdensity bands
-    from a unified CSV file.
+    Generic bulk-flow plotting function conditioned on an arbitrary variable.
 
     Parameters
     ----------
+    variable_name : str
+        Name used in CSV column prefix:
+        expected format: V_{variable_name}_{low}_to_{high}_mean
+
+    var_min, var_max, var_step :
+        Range used for color normalization.
+
     plot_errors : bool
-        If True, plot ±1σ shaded bands using the *_std columns.
+        If True, plot ±1σ shaded bands.
+
     show_markers : bool
-        If True, show markers on the mean curves.
+        If True, show markers on curves.
     """
+
+    import os
+    import re
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+
+    # --------------------------------------------------
+    # Resolve output folder
+    # --------------------------------------------------
+    if output_folder is None:
+        output_folder = os.path.dirname(csv_file)
+
+    if output_file is None:
+        output_file = f"bulkflow_vs_radius_{variable_name}.png"
 
     # --------------------------------------------------
     # Load CSV
     # --------------------------------------------------
     df = pd.read_csv(csv_file)
-
     radii = df["radius"].values
 
     # --------------------------------------------------
-    # Identify overdensity bands from column names
+    # Identify bands from column names
+    # Expected: V_{variable_name}_{low}_to_{high}_mean
     # --------------------------------------------------
-    band_pattern = re.compile(r"V_band_(-?\d+\.\d)_to_(-?\d+\.\d)_mean")
+    pattern = re.compile(
+        rf"V_band_(\-?\d+\.?\d*)_to_(\-?\d+\.?\d*)_mean"
+    )
 
     bands = []
+
     for col in df.columns:
-        m = band_pattern.match(col)
+        m = pattern.match(col)
         if m:
             low = float(m.group(1))
             high = float(m.group(2))
             bands.append((low, high, col))
 
     if not bands:
-        raise ValueError("No overdensity band columns found in CSV.")
+        raise ValueError(
+            f"No matching columns found for variable '{variable_name}'."
+        )
 
-    # Sort bands by overdensity
     bands.sort(key=lambda x: x[0])
 
     # --------------------------------------------------
-    # Color mapping: overdensity → color
+    # Colormap normalization
     # --------------------------------------------------
-    norm = mpl.colors.TwoSlopeNorm(vmin=-0.5, vcenter=0.0, vmax=0.5)
     cmap = plt.cm.coolwarm
+
+    # Use symmetric normalization only if variable crosses zero
+    if var_min < 0 < var_max:
+        norm = mpl.colors.TwoSlopeNorm(
+            vmin=var_min,
+            vcenter=0.0,
+            vmax=var_max,
+        )
+    else:
+        norm = mpl.colors.Normalize(vmin=var_min, vmax=var_max)
 
     marker = "o" if show_markers else None
 
-    plt.figure(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(8, 5))
 
     # --------------------------------------------------
-    # Plot each overdensity band
+    # Plot bands
     # --------------------------------------------------
     for low, high, mean_col in bands:
 
         std_col = mean_col.replace("_mean", "_std")
+        mid = 0.5 * (low + high)
+        color = cmap(norm(mid))
 
-        color = cmap(norm(0.5 * (low + high)))
-
-        plt.plot(
+        ax.plot(
             radii,
             df[mean_col],
             color=color,
@@ -511,7 +551,7 @@ def plot_bulkflow_from_csv(
         )
 
         if plot_errors and std_col in df.columns:
-            plt.fill_between(
+            ax.fill_between(
                 radii,
                 df[mean_col] - df[std_col],
                 df[mean_col] + df[std_col],
@@ -523,39 +563,36 @@ def plot_bulkflow_from_csv(
     # Theory
     # --------------------------------------------------
     if plot_theory and "U_mean_theory" in df.columns:
-        plt.plot(
+        ax.plot(
             radii,
             df["U_mean_theory"],
             "k--",
             linewidth=2.5,
             label=r"$\Lambda$CDM $\langle |U| \rangle$",
         )
+        ax.legend()
 
     # --------------------------------------------------
-    # Colorbar (instead of legend spam)
+    # Colorbar
     # --------------------------------------------------
     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    ax = plt.gca()
-    cbar = plt.colorbar(sm, ax=ax)
-    cbar.set_label(r"Origin overdensity $\delta$")
+    cbar = fig.colorbar(sm, ax=ax)
+    cbar.set_label(variable_name)
 
     # --------------------------------------------------
-    # Final styling
+    # Styling
     # --------------------------------------------------
-    plt.xlabel(r"Radius [$h^{-1}$ Mpc]")
-    plt.ylabel(r"$\langle |U| \rangle$ [km/s]")
-    plt.title("Bulk Flow vs Radius\nConditioned on Origin Overdensity (Full Mask)")
-    plt.grid(True)
-    plt.tight_layout()
+    ax.set_xlabel(r"Radius [$h^{-1}$ Mpc]")
+    ax.set_ylabel(r"$\langle |U| \rangle$ [km/s]")
+    ax.set_title(
+        f"Bulk Flow vs Radius\nConditioned on {variable_name}"
+    )
+    ax.grid(True)
+
+    fig.tight_layout()
 
     os.makedirs(output_folder, exist_ok=True)
-    plt.savefig(os.path.join(output_folder, output_file), dpi=150)
-    plt.close()
+    fig.savefig(os.path.join(output_folder, output_file), dpi=150)
+    plt.close(fig)
 
-
-# ------------------------------------------------------
-# Entry point
-# ------------------------------------------------------
-if __name__ == "__main__":
-    visualize()

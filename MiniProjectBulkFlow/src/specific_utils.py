@@ -6,14 +6,6 @@ import os
 from .theoretical_bulkflow import theoretical_bulkflow_colossus
 
 
-def weighted_average(values, weights):
-    """Compute weighted average safely."""
-    values = np.asarray(values)
-    weights = np.asarray(weights)
-    if np.sum(weights) == 0:
-        return np.nan
-    return np.sum(values * weights) / np.sum(weights)
-
 # ================================================================
 # Periodic distance computations
 # ================================================================
