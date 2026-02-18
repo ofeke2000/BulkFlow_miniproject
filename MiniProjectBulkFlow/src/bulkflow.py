@@ -37,6 +37,10 @@ from scipy.spatial import cKDTree
 from scipy.linalg import lu_factor, lu_solve
 from .specific_utils import radial_velocity_and_error_pbc
 
+###########################################################################
+# Bulk flow series (cumulative chi^2 ML estimator)
+###########################################################################
+
 def bulk_flow_chi2_cumulative(
     r_hat: np.ndarray,
     r_sorted: np.ndarray,
@@ -136,6 +140,71 @@ def bulk_flow_chi2_cumulative(
         columns=["radius", "u_x", "u_y", "u_z", "U_total"]
     )
 
+##########################################################################
+# Bulk flow series (cumulative mean estimator)
+##########################################################################
+
+def bulk_flow_mean_cumulative(
+    r_hat: np.ndarray,
+    r_sorted: np.ndarray,
+    r_list: list,
+    v_rad: np.ndarray,
+    sigma: np.ndarray,
+    sigma_star: float = 250.0
+) -> pd.DataFrame:
+    """
+    Cumulative mean bulk-flow estimator.
+
+    Computes the average 3D velocity inside each radius R:
+        u = <v_x, v_y, v_z>
+    where v = v_rad * r_hat.
+
+    Parameters
+    ----------
+    Same as bulk_flow_chi2_cumulative (sigma, sigma_star unused).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns: [radius, u_x, u_y, u_z, U_total]
+    """
+
+    r_list = np.asarray(r_list)
+
+    results = []
+    idx = 0
+    N = len(r_sorted)
+
+    # Cumulative sums
+    sum_v = np.zeros(3)
+    count = 0
+
+    for R in r_list:
+
+        # Accumulate until radius threshold
+        while idx < N and r_sorted[idx] <= R:
+
+            # Reconstruct 3D velocity from radial component
+            v_vec = v_rad[idx] * r_hat[idx]
+
+            sum_v += v_vec
+            count += 1
+
+            idx += 1
+
+        if count > 0:
+            u = sum_v / count
+        else:
+            u = np.array([np.nan, np.nan, np.nan])
+
+        U = np.linalg.norm(u)
+
+        results.append([R, u[0], u[1], u[2], U])
+
+    return pd.DataFrame(
+        results,
+        columns=["radius", "u_x", "u_y", "u_z", "U_total"]
+    )
 
 
 ##########################################################################
@@ -148,6 +217,7 @@ def calculate_bulk_flow_series(
     r_max: float,
     r_min: float,
     r_jumps: float,
+    calculation_method: str = "chi2",
     error_frac: float = 0.20,
     sigma_star: float = 250.0,
     sigma_min: float = 50.0
@@ -216,16 +286,31 @@ def calculate_bulk_flow_series(
     # ---------------------------------------------------------
     # (4) Compute bulk flow table
     # ---------------------------------------------------------
-    velocities_df = bulk_flow_chi2_cumulative(
-        r_hat=r_hat,
-        r_sorted=r_sorted,
-        r_list=r_list,
-        v_rad=v_rad,
-        sigma=sigma,
-        sigma_star=sigma_star
-    )
+    if calculation_method == "chi2":
+        velocities_df = bulk_flow_chi2_cumulative(
+            r_hat=r_hat,
+            r_sorted=r_sorted,
+            r_list=r_list,
+            v_rad=v_rad,
+            sigma=sigma,
+            sigma_star=sigma_star
+        )
+    elif calculation_method == "mean":
+        velocities_df = bulk_flow_mean_cumulative(
+            r_hat=r_hat,
+            r_sorted=r_sorted,
+            r_list=r_list,
+            v_rad=v_rad,
+            sigma=sigma,
+            sigma_star=sigma_star
+        )
 
     return velocities_df
+
+
+###########################################################################
+# Local bulk flow (neighbor averaging)
+###########################################################################
 
 def calculate_local_bulkflow(
     df,

@@ -80,6 +80,7 @@ def main():
     error_frac = cfg["bulkflow"]["error_fraction"]
     sigma_star = cfg["bulkflow"]["sigma_star"]
     sigma_min = cfg["bulkflow"]["sigma_min"]
+    calculation_method = cfg["bulkflow"]["calculation_method"]
 
     logging.info("Configuration loaded successfully.")
 
@@ -413,6 +414,7 @@ def main():
             r_max=r_max,
             r_min=r_min,
             r_jumps=r_jump,
+            calculation_method=calculation_method,
             error_frac=error_frac,
             sigma_star=sigma_star,
             sigma_min=sigma_min

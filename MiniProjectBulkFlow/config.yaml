@@ -43,6 +43,7 @@ bulkflow:
   error_fraction: 0.2        # 20%
   sigma_star: 250.0          # km/s
   sigma_min: 50.0            # km/s
+  calculation_method: "chi2"  # "chi2" or "mean"
 
 
 visualization:
