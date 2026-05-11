@@ -1,64 +1,117 @@
-# Arcitecture
+# Architecture
 
-Here i will describe the purpose of the different parts of the code
+Here I will describe the purpose of the different parts of the code.
 
-## miniproj
+## Project Structure
 
-### config (yaml)
+### config.yaml
 
-It will be a file where I insert into the code everything that needs changing, from overdensity radius to file paths
+Configuration file containing all adjustable parameters, file paths, and settings for the bulk flow analysis pipeline. This includes:
+- Data paths (Rockstar catalog, CF4 catalog, output directories)
+- Environmental analysis parameters (overdensity radius, bulkflow radius)
+- Origin selection criteria (mass cuts, overdensity ranges, bulkflow limits)
+- Bulkflow computation settings (radii ranges, masks mode, calculation methods)
+- Visualization options
 
-### main (py)
+### main.py
 
-That is the part where i combine my functions into an actual working code with purpose
+Main orchestration script that runs the entire bulk flow analysis pipeline. It imports and calls the modular scripts in sequence:
+1. Data preprocessing
+2. Environmental analysis
+3. Origin selection
+4. Bulkflow computation
+5. Postprocessing and visualization
 
-## data
+### scripts/
 
-Where i keep the source data for rockstar and CF4
+Directory containing modular pipeline stage scripts, each handling a specific phase of the analysis.
 
-## output
+#### data_preprocessing.py
+Loads the Rockstar halo catalog, applies mass cuts, builds a KDTree for spatial queries, and optionally loads CF4 catalog data. Returns processed dataframes and spatial index.
 
-A place to put all files at
+#### environment_analysis.py
+Computes environmental properties for each halo:
+- Local overdensity within specified radius
+- Near-Virgo cluster proximity test
+- Local bulk flow velocity
 
-## src
+#### origin_selection.py
+Selects origin points (halos) for bulk flow computation based on environmental criteria. Supports filtering by overdensity, mass, and local bulk flow, with options for lowest overdensity selection or random sampling.
 
-Where I'll put all my functions
+#### bulkflow_computation.py
+Computes bulk flow time series for selected origins. Supports configurable masking modes:
+- "full": Full halo catalog
+- "cf4": CF4-based mask
+- "uniform": Uniform density mask
+- "all": Compute all mask types
 
-### __init__ (py)
+#### postprocessing.py
+Aggregates HDF5 results from bulk flow computations and generates final plots and summaries.
 
-I have no idea what these is for, Chat GPT said it needs to be there for python to recognize it like a library
+### src/
 
-### dataloader (py)
+Directory containing reusable utility functions and core computational modules.
 
-Functions that loads data frames from the files in the wanted format, usually edites the files thus seperated from utils
+#### __init__.py
+Package initializer to make src/ importable as a module.
 
-### overdensity (py)
+#### bulkflow.py
+Functions for calculating bulk flow velocities from halo catalogs, including series computation over radial ranges.
 
-Calculates and addes the overdensity to the data frame for a given radius around a galaxy
+#### classes.py
+Custom classes for data structures (if any).
 
-### masks (py)
+#### data_loader.py
+Functions for loading and preprocessing data from Rockstar and CF4 catalog files.
 
-creates a new data frame which is masked, either with the CF4 data or uniformly. can be expended in the future
+#### masks.py
+Functions for creating masked halo catalogs:
+- CF4-based masks using cluster finder data
+- Uniform density masks
 
-### bulkflow (py)
+#### near_virgo.py
+Implements the near-Virgo cluster environmental test.
 
-Functions that calculates the bulk flow of galaxies around a given dot in a given radii from a given data frame (could be masked if needed)
+#### overdensity.py
+Calculates local overdensity around halos using spatial queries.
 
-### visualize
+#### specific_utils.py
+Specialized utility functions for calculations, including periodic distance calculations.
 
-Functions to create plots
+#### theoretical_bulkflow.py
+Theoretical models and predictions for bulk flow behavior.
 
-### utils (py)
+#### utils.py
+General utility functions:
+- Logger setup
+- Timing functions
+- Directory creation
+- Dataframe saving
 
-Functions which can be used for all around helping, contains:
+#### visualize.py
+Plotting and visualization functions for histograms, bulk flow curves, and simulation slices.
 
-1. logger setup
-2. timing functions
-3. ensur directory exists
-4. save data frame
+## data/
 
-### specific_utils (py)
+Directory containing source data files:
+- Rockstar halo catalogs (CSV format)
+- CF4 cluster finder data (CSV format)
 
-Like utils but specificly for calculations like:
+## output/
 
-1. periodic distance calculator
+Directory for all generated output files:
+- Processed data checkpoints
+- HDF5 files with bulk flow results
+- Plots and visualizations
+- Log files
+
+## Pipeline Flow
+
+1. **Configuration**: Load settings from config.yaml
+2. **Data Preprocessing**: Load catalogs, apply cuts, build spatial index
+3. **Environmental Analysis**: Compute overdensity, Virgo proximity, local bulk flow for all halos
+4. **Origin Selection**: Choose halos with desired environmental properties
+5. **Bulk Flow Computation**: Calculate bulk flow series for selected origins with chosen masks
+6. **Postprocessing**: Aggregate results and generate plots
+
+The pipeline is designed to be modular and configurable, allowing easy switching between different analysis modes (e.g., CF4 vs uniform masks) and parameter sets.

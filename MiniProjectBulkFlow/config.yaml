@@ -21,22 +21,8 @@ columns:
   - vy
   - vz
 
-origin_configs:
-  local_overdensity_radius: 3.0    # h^-1 Mpc
-  local_overdensity_upper_cut: 0.5
-  local_overdensity_lower_cut: 0.4  
-  local_bulkflow_radius: 3.0     # h^-1 Mpc
-  local_bulkflow_upper_cut: 1500.0  # km/s
-  local_bulkflow_lower_cut: 1400.0    # km/s
-  use_virgo_criteria: true
-  number_of_origins: 1000
-  mass_cut: 1e14                # h^-1 Msun
-  mass_cut_bool: false        # if true, apply mass cut
-  select_lowest_delta: false  # if true, select points with lowest |delta|; 
-  select_random: true      # if true, select random points from candidates after cuts
-
 bulkflow:
-  masks: "full"            # "full", "cf4", or "uniform"
+  masks: "full"            # "full", "cf4", "uniform", or "all"
   max_radius: 250.0          # h^-1 Mpc
   min_radius: 50.0           # h^-1 Mpc
   radii_step: 5.0           # h^-1 Mpc
@@ -44,7 +30,40 @@ bulkflow:
   sigma_star: 250.0          # km/s
   sigma_min: 50.0            # km/s
   calculation_method: "chi2"  # "chi2" or "mean"
+  cf4_match_radius: 5.0      # h^-1 Mpc for CF4 masking
+  cf4_match_max_doublings: 5
+  uniform_radius: 250.0      # h^-1 Mpc for uniform mask selection
 
+origin_configs:
+  local_overdensity_radius: 3.0    # h^-1 Mpc
+  local_overdensity_upper_cut: 0.5
+  local_overdensity_lower_cut: 0.4
+  apply_overdensity_cut: false
+  apply_mass_selection: false
+  selection_mass_min: 1e14
+  selection_mass_max: 1e16
+  local_bulkflow_radius: 3.0     # h^-1 Mpc
+  local_bulkflow_upper_cut: 1500.0  # km/s
+  local_bulkflow_lower_cut: 1400.0    # km/s
+  use_virgo_criteria: true
+  number_of_origins: 1000
+  mass_cut: 1e14                # h^-1 Msun
+  mass_cut_bool: false        # if true, apply mass cut to the entire catalog
+  select_lowest_delta: false  # if true, select points with lowest |delta|
+  select_random: true      # if true, select random points from candidates after cuts
 
 visualization:
   projection_plane: "xy"
+  simulation_slice_heatmap:
+    enabled: false
+    slice_axis: "z"
+    slice_min: 400.0
+    slice_max: 500.0
+    proj_axes: ["x", "y"]
+    gridsize: 500
+    cmap: "magma"
+    output_file: "simulation_slice_heatmap.png"
+
+postprocessing:
+  enabled: false
+  build_comparison_plots: false
