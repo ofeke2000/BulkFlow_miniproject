@@ -9,9 +9,10 @@ import pandas as pd
 import logging
 
 from src.visualize import plot_histogram
+from src.classes import AppConfig
 
 
-def select_origin_points(halos_df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+def select_origin_points(halos_df: pd.DataFrame, cfg: AppConfig) -> pd.DataFrame:
     """
     Select origin points based on configuration criteria.
 
@@ -22,21 +23,21 @@ def select_origin_points(halos_df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     Returns:
         selected_points: DataFrame of selected origin points
     """
-    radius_overdensity = cfg["origin_configs"]["local_overdensity_radius"]
-    radius_bulkflow = cfg["origin_configs"]["local_bulkflow_radius"]
-    overdensity_upper_cut = cfg["origin_configs"]["local_overdensity_upper_cut"]
-    overdensity_lower_cut = cfg["origin_configs"]["local_overdensity_lower_cut"]
-    apply_overdensity_cut = cfg["origin_configs"].get("apply_overdensity_cut", False)
-    apply_mass_selection = cfg["origin_configs"].get("apply_mass_selection", False)
-    selection_mass_min = cfg["origin_configs"].get("selection_mass_min", None)
-    selection_mass_max = cfg["origin_configs"].get("selection_mass_max", None)
-    bulkflow_upper_cut = cfg["origin_configs"]["local_bulkflow_upper_cut"]
-    bulkflow_lower_cut = cfg["origin_configs"]["local_bulkflow_lower_cut"]
-    use_virgo_criteria = cfg["origin_configs"]["use_virgo_criteria"]
-    n_origins = cfg["origin_configs"]["number_of_origins"]
-    lowest_delta = cfg["origin_configs"]["select_lowest_delta"]
-    select_random = cfg["origin_configs"]["select_random"]
-    output_folder = cfg["paths"]["output_folder"]
+    radius_overdensity = cfg.origin_configs.local_overdensity_radius
+    radius_bulkflow = cfg.origin_configs.local_bulkflow_radius
+    overdensity_upper_cut = cfg.origin_configs.local_overdensity_upper_cut
+    overdensity_lower_cut = cfg.origin_configs.local_overdensity_lower_cut
+    apply_overdensity_cut = cfg.origin_configs.apply_overdensity_cut
+    apply_mass_selection = cfg.origin_configs.apply_mass_selection
+    selection_mass_min = cfg.origin_configs.selection_mass_min
+    selection_mass_max = cfg.origin_configs.selection_mass_max
+    bulkflow_upper_cut = cfg.origin_configs.local_bulkflow_upper_cut
+    bulkflow_lower_cut = cfg.origin_configs.local_bulkflow_lower_cut
+    use_virgo_criteria = cfg.origin_configs.use_virgo_criteria
+    n_origins = cfg.origin_configs.number_of_origins
+    lowest_delta = cfg.origin_configs.select_lowest_delta
+    select_random = cfg.origin_configs.select_random
+    output_folder = cfg.paths.output_folder
 
     delta_column = f"delta_{int(radius_overdensity)}"
     virgo_column = "near_virgo"

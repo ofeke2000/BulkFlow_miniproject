@@ -13,6 +13,7 @@ import time
 from scipy.spatial import cKDTree
 
 from src.bulkflow import calculate_bulk_flow_series
+from src.classes import AppConfig, Vector3D
 from src.masks import make_cf4_mask, make_uniform_mask
 from src.specific_utils import append_bulkflow_results
 
@@ -21,7 +22,7 @@ def compute_bulkflows_for_origins(
     halos_df: pd.DataFrame,
     selected_points: pd.DataFrame,
     tree: cKDTree,
-    cfg: dict,
+    cfg: AppConfig,
     cf4_df: Optional[pd.DataFrame] = None,
 ) -> dict:
     """
@@ -37,19 +38,19 @@ def compute_bulkflows_for_origins(
     Returns:
         timings: Dictionary with timing information
     """
-    output_file = cfg["paths"]["output_file"]
-    r_min = cfg["bulkflow"]["min_radius"]
-    r_max = cfg["bulkflow"]["max_radius"]
-    r_jump = cfg["bulkflow"]["radii_step"]
-    error_frac = cfg["bulkflow"]["error_fraction"]
-    sigma_star = cfg["bulkflow"]["sigma_star"]
-    sigma_min = cfg["bulkflow"]["sigma_min"]
-    calculation_method = cfg["bulkflow"]["calculation_method"]
-    mask_mode = cfg["bulkflow"].get("masks", cfg.get("mask_type", "full"))
-    cf4_match_radius = cfg["bulkflow"].get("cf4_match_radius", 5.0)
-    cf4_match_max_doublings = cfg["bulkflow"].get("cf4_match_max_doublings", 5)
-    uniform_radius = cfg["bulkflow"].get("uniform_radius", r_max)
-    box_size = cfg["MDPL2"]["box_size"]
+    output_file = cfg.paths.output_file
+    r_min = cfg.bulkflow.min_radius
+    r_max = cfg.bulkflow.max_radius
+    r_jump = cfg.bulkflow.radii_step
+    error_frac = cfg.bulkflow.error_fraction
+    sigma_star = cfg.bulkflow.sigma_star
+    sigma_min = cfg.bulkflow.sigma_min
+    calculation_method = cfg.bulkflow.calculation_method
+    mask_mode = cfg.bulkflow.masks or cfg.get("mask_type", "full")
+    cf4_match_radius = cfg.bulkflow.cf4_match_radius
+    cf4_match_max_doublings = cfg.bulkflow.cf4_match_max_doublings
+    uniform_radius = cfg.bulkflow.uniform_radius
+    box_size = cfg.MDPL2.box_size
 
     if mask_mode in ("cf4", "uniform", "all") and cf4_df is None:
         raise ValueError("CF4 DataFrame is required when bulkflow.masks is 'cf4', 'uniform', or 'all'.")
@@ -65,7 +66,7 @@ def compute_bulkflows_for_origins(
 
     t0_bulk = time.time()
     for i, (_, row) in enumerate(selected_points.iterrows()):
-        origin = (row["x"], row["y"], row["z"])
+        origin = Vector3D.from_sequence((row["x"], row["y"], row["z"]))
         origin_id = int(row["rockstarid"])
 
         if n_origins > 0 and i > 0 and (100 * i / n_origins) % 5 == 0:
@@ -78,7 +79,7 @@ def compute_bulkflows_for_origins(
 
         if use_cf4:
             cf4_mask_df = make_cf4_mask(
-                position=np.array(origin),
+                position=origin.to_array(),
                 halos_df=halos_df,
                 cf4_df=cf4_df,
                 tree=tree,
@@ -106,7 +107,7 @@ def compute_bulkflows_for_origins(
 
         if use_uniform:
             uniform_mask_df = make_uniform_mask(
-                position=np.array(origin),
+                position=origin.to_array(),
                 radius=uniform_radius,
                 df_halos=halos_df,
                 CF4_catalogue=cf4_df,
@@ -131,7 +132,7 @@ def compute_bulkflows_for_origins(
             )
 
         if use_full:
-            idx_full = tree.query_ball_point(np.array(origin), r=r_max)
+            idx_full = tree.query_ball_point(origin.to_array(), r=r_max)
             full_mask_df = halos_df.iloc[idx_full].copy()
             bf_full = calculate_bulk_flow_series(
                 halos_df=full_mask_df,

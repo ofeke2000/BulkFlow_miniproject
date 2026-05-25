@@ -51,7 +51,7 @@ def main():
     timings["environmental_analysis"] = time.time() - t0
 
     # Save catalog with environmental data
-    save_catalog_checkpoint(halos_df, cfg["paths"]["rockstar_catalog"])
+    save_catalog_checkpoint(halos_df, cfg.paths.rockstar_catalog)
 
     # ===========================================
     # 4. Origin selection
@@ -71,10 +71,10 @@ def main():
     # ===========================================
     # 6. Final visualization
     # ===========================================
-    bulkflow_lower_cut = cfg["origin_configs"]["local_bulkflow_lower_cut"]
-    bulkflow_upper_cut = cfg["origin_configs"]["local_bulkflow_upper_cut"]
-    output_folder = cfg["paths"]["output_folder"]
-    output_file = cfg["paths"]["output_file"]
+    bulkflow_lower_cut = cfg.origin_configs.local_bulkflow_lower_cut
+    bulkflow_upper_cut = cfg.origin_configs.local_bulkflow_upper_cut
+    output_folder = cfg.paths.output_folder
+    output_file = cfg.paths.output_file
 
     plot_bulkflow_from_hdf5(
         hdf_file=output_file,
