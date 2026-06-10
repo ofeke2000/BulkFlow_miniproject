@@ -46,7 +46,7 @@ def compute_bulkflows_for_origins(
     sigma_star = cfg.bulkflow.sigma_star
     sigma_min = cfg.bulkflow.sigma_min
     calculation_method = cfg.bulkflow.calculation_method
-    mask_mode = cfg.bulkflow.masks or cfg.get("mask_type", "full")
+    mask_mode = cfg.bulkflow.masks or "full"
     cf4_match_radius = cfg.bulkflow.cf4_match_radius
     cf4_match_max_doublings = cfg.bulkflow.cf4_match_max_doublings
     uniform_radius = cfg.bulkflow.uniform_radius

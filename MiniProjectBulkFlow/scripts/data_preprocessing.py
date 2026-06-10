@@ -39,7 +39,7 @@ def preprocess_data(cfg: AppConfig) -> tuple[pd.DataFrame, cKDTree, Optional[pd.
     box_size = cfg.MDPL2.box_size
     mass_cut_bool = cfg.origin_configs.mass_cut_bool
     mass_cut = cfg.origin_configs.mass_cut
-    mask_mode = cfg.bulkflow.masks or cfg.get("mask_type", "full")
+    mask_mode = cfg.bulkflow.masks or "full"
 
     # Load catalog
     logging.info("Loading Rockstar catalog...")
@@ -63,7 +63,7 @@ def preprocess_data(cfg: AppConfig) -> tuple[pd.DataFrame, cKDTree, Optional[pd.
     logging.info("cKDTree built successfully.")
 
     cf4_df = None
-    if mask_mode in ("cf4", "uniform", "all"):
+    if cfg.bulkflow.masks in ("cf4", "uniform", "all"):
         cf4_path = cfg.paths.cf4_catalog
         logging.info("Loading CF4 catalog for optional masks...")
         cf4_df = load_cf4_catalogue(cf4_path, h=cfg.MDPL2.HubbleParameter)

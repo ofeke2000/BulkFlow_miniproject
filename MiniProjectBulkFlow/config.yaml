@@ -1,25 +1,15 @@
 
-mask_type: cf4             # "cf4" or "uniform"
+# CF4 catalog selection: "cf4" or "cf4_velocities"
+cf4_catalog_type: "cf4"
 
-MDPL2:
-  HubbleParameter: 0.6777                 # Hubble parameter for distance conversions
-  box_size: 1000.0                        # h^-1 Mpc
+# Output folder selection: "default" or "temp"
+output_folder_type: "default"
 
-paths:
-  rockstar_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv" 
-  cf4_catalog: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/CF4_Groups (edited).csv"
-  output_folder: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_cuts_rmax250_rmin10_jumps5/"
-  output_file: "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_cuts_rmax250_rmin10_jumps5/bulkflow_cut_1400_to_1500.h5"
+# Temporary folder name (only used if output_folder_type is "temp", will be inside output/)
+temp_folder_name: "temp_bulkflow"
 
-columns:
-  - rockstarid
-  - mvir
-  - x
-  - y
-  - z
-  - vx
-  - vy
-  - vz
+# Output file name (without folder path)
+output_file_name: "bulkflow_cut_1400_to_1500.h5"
 
 bulkflow:
   masks: "full"            # "full", "cf4", "uniform", or "all"
@@ -51,18 +41,6 @@ origin_configs:
   mass_cut_bool: false        # if true, apply mass cut to the entire catalog
   select_lowest_delta: false  # if true, select points with lowest |delta|
   select_random: true      # if true, select random points from candidates after cuts
-
-visualization:
-  projection_plane: "xy"
-  simulation_slice_heatmap:
-    enabled: false
-    slice_axis: "z"
-    slice_min: 400.0
-    slice_max: 500.0
-    proj_axes: ["x", "y"]
-    gridsize: 500
-    cmap: "magma"
-    output_file: "simulation_slice_heatmap.png"
 
 postprocessing:
   enabled: false

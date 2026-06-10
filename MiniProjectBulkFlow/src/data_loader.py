@@ -34,6 +34,28 @@ def load_rockstar_catalog(path: str, columns=None) -> pd.DataFrame:
     return df
 
 
+def _read_cf4_csv(path: str) -> pd.DataFrame:
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        first_line = f.readline()
+        second_line = f.readline()
+        third_line = f.readline()
+        fourth_line = f.readline()
+        fifth_line = f.readline()
+
+    # Many CF4 files use a 5-line format header:
+    #   1) human-readable title row
+    #   2) machine-readable column names row
+    #   3) FORTRAN-style format row
+    #   4) units row
+    #   5) description row
+    if second_line.lower().startswith('pgc') and third_line.strip().startswith('%'):
+        df = pd.read_csv(path, header=1, skiprows=[2, 3, 4])
+    else:
+        df = pd.read_csv(path)
+
+    return df
+
+
 def load_cf4_catalogue(path: str, h: float = 0.7) -> pd.DataFrame:
     """
     Load the CosmicFlows-4 (CF4) groups catalogue.
@@ -46,34 +68,45 @@ def load_cf4_catalogue(path: str, h: float = 0.7) -> pd.DataFrame:
     Returns
     -------
     df : pandas.DataFrame
-        DataFrame with relevant columns such as:
-        'GroupID', 'RA', 'Dec', 'Dist_Mpc', 'Vpec', 'sigma_D', etc.
+        DataFrame with Cartesian coordinates in columns ['x', 'y', 'z'].
     """
     print(f"Loading CF4 catalogue from {path}...")
-    df = pd.read_csv(path)
+    df = _read_cf4_csv(path)
     print(f"Loaded {len(df):,} CF4 entries.")
 
-    # Rename for consistency
+    # Normalize column names
     rename_map = {
         'pgc': 'id',
+        'PGC': 'id',
         'RA': 'ra',
         'DE': 'dec',
-        'DM_av': 'distance_modulus',
-        'Vcmb': 'Vcmb'
+        'Vcmb': 'vcmb',
+        'Vcmbm': 'vcmb',
     }
     df = df.rename(columns=rename_map)
 
-    # Remove entries with missing distances
-    df = df.dropna(subset=['distance_modulus'])
+    # Normalize distance fields
+    if 'D' in df.columns and 'distance' not in df.columns:
+        df['distance'] = df['D'] * h
+    elif 'distance_modulus' not in df.columns:
+        for candidate in ('DM_av', 'DM_av', 'DM_zp', 'DMzp', 'DM_zp'):
+            if candidate in df.columns:
+                df['distance_modulus'] = df[candidate]
+                break
+
+    if 'distance' not in df.columns and 'distance_modulus' in df.columns:
+        df['distance'] = distance_modulus_to_mpc(df['distance_modulus'].values, h=h)
+
+    required = {'ra', 'dec', 'distance'}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"CF4 catalogue is missing required columns: {sorted(missing)}")
+
+    df = df.dropna(subset=['distance', 'ra', 'dec'])
     print(f"After cleaning: {len(df):,} groups remain.")
 
-    # Convert distance modulus to distance in Mpc/h
-    df['distance'] = distance_modulus_to_mpc(df['distance_modulus'].values, h=h)
-
-    # Convert coordinates to Cartesian
     df = cf4_to_cartesian(df)
     print("Converted RA/Dec/Dist → Cartesian (x, y, z).")
-
 
     return df
 
