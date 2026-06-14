@@ -14,8 +14,12 @@ from scipy.spatial import cKDTree
 
 from src.bulkflow import calculate_bulk_flow_series
 from src.classes import AppConfig, Vector3D
-from src.masks import make_cf4_mask, make_uniform_mask
+from src.masks import MaskMaker
 from src.specific_utils import append_bulkflow_results
+
+LOG_PERCENT_CADENCE = 5
+PERCENT_FACTOR = 100
+ETA_MIN_FACTOR = 60
 
 
 def compute_bulkflows_for_origins(
@@ -59,6 +63,13 @@ def compute_bulkflows_for_origins(
     use_uniform = mask_mode in ("uniform", "all")
     use_full = mask_mode in ("full", "all")
 
+    mask_maker = MaskMaker(
+        halos_df=halos_df,
+        tree=tree,
+        box_size=box_size,
+        cf4_df=cf4_df,
+    )
+
     per_origin_times = []
     n_origins = len(selected_points)
 
@@ -69,21 +80,21 @@ def compute_bulkflows_for_origins(
         origin = Vector3D.from_sequence((row["x"], row["y"], row["z"]))
         origin_id = int(row["rockstarid"])
 
-        if n_origins > 0 and i > 0 and (100 * i / n_origins) % 5 == 0:
+        if n_origins > 0 and i > 0 and (PERCENT_FACTOR * i / n_origins) % LOG_PERCENT_CADENCE == 0:
             logging.info(f"Processing origin ID {origin_id} at {origin}")
             avg_time = np.mean(per_origin_times)
             eta = avg_time * (n_origins - i)
-            logging.info(f"=== Processing origin {i}/{n_origins} ({100*i/n_origins:.1f}%), ETA ~ {eta/60:.1f} min ===")
+            logging.info(
+                f"=== Processing origin {i}/{n_origins} "
+                f"({PERCENT_FACTOR*i/n_origins:.1f}%), "
+                f"ETA ~ {eta/ETA_MIN_FACTOR:.1f} min ==="
+            )
 
         t_origin = time.time()
 
         if use_cf4:
-            cf4_mask_df = make_cf4_mask(
+            cf4_mask_df = mask_maker.make_cf4_mask(
                 position=origin.to_array(),
-                halos_df=halos_df,
-                cf4_df=cf4_df,
-                tree=tree,
-                box_size=box_size,
                 radius=cf4_match_radius,
                 max_doublings=cf4_match_max_doublings,
             )
@@ -93,6 +104,7 @@ def compute_bulkflows_for_origins(
                 r_max=r_max,
                 r_min=r_min,
                 r_jumps=r_jump,
+                box_size=box_size,
                 calculation_method=calculation_method,
                 error_frac=error_frac,
                 sigma_star=sigma_star,
@@ -106,12 +118,9 @@ def compute_bulkflows_for_origins(
             )
 
         if use_uniform:
-            uniform_mask_df = make_uniform_mask(
+            uniform_mask_df = mask_maker.make_uniform_mask(
                 position=origin.to_array(),
                 radius=uniform_radius,
-                df_halos=halos_df,
-                CF4_catalogue=cf4_df,
-                tree=tree,
             )
             bf_uniform = calculate_bulk_flow_series(
                 halos_df=uniform_mask_df,
@@ -119,6 +128,7 @@ def compute_bulkflows_for_origins(
                 r_max=r_max,
                 r_min=r_min,
                 r_jumps=r_jump,
+                box_size=box_size,
                 calculation_method=calculation_method,
                 error_frac=error_frac,
                 sigma_star=sigma_star,
@@ -140,6 +150,7 @@ def compute_bulkflows_for_origins(
                 r_max=r_max,
                 r_min=r_min,
                 r_jumps=r_jump,
+                box_size=box_size,
                 calculation_method=calculation_method,
                 error_frac=error_frac,
                 sigma_star=sigma_star,

@@ -6,12 +6,29 @@ Here I will describe the purpose of the different parts of the code.
 
 ### config.yaml
 
-Configuration file containing all adjustable parameters, file paths, and settings for the bulk flow analysis pipeline. This includes:
+Configuration file containing all user-tunable pipeline parameters, file paths, and settings. This includes:
 - Data paths (Rockstar catalog, CF4 catalog, output directories)
 - Environmental analysis parameters (overdensity radius, bulkflow radius)
-- Origin selection criteria (mass cuts, overdensity ranges, bulkflow limits)
+- Origin selection criteria (mass cuts, overdensity ranges, bulkflow limits, `virgo_test.enabled`)
 - Bulkflow computation settings (radii ranges, masks mode, calculation methods)
-- Visualization options
+- Visualization options and postprocessing settings
+
+### src/config/
+
+Config dataclasses mirroring `config.yaml`. Each section of the yaml has a corresponding dataclass:
+
+| Dataclass | Purpose |
+|-----------|---------|
+| `MDPL2Config` | Fixed simulation box parameters (box_size, HubbleParameter) |
+| `CosmologyConfig` | Fixed MDPL2 cosmology (H0, Om0, growth_index, bulk_flow_amplitude_factor) — not user-edited |
+| `TheoryConfig` | Colossus integration settings (z, k_min, k_max, k_limit) |
+| `VirgoTestConfig` | Virgo proximity test parameters (mass_threshold, r_min, r_max) |
+| `BulkFlowConfig` | Bulk flow estimator settings (radii, masks, error model) |
+| `OriginConfig` | Origin selection cuts (overdensity, bulkflow, Virgo, mass) |
+| `PostprocessingConfig` | Postprocessing band edges, plot ranges, and alpha values |
+| `VisualizationConfig` | Plot styling (figsize, dpi, alpha, linewidth, bins) via nested `PlotStyleConfig` |
+| `PathsConfig` | All file/directory paths |
+| `AppConfig` | Root config holding all of the above; loaded via `AppConfig.from_dict(yaml)` |
 
 ### main.py
 

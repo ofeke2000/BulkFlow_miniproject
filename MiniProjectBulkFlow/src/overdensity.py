@@ -18,81 +18,66 @@ import pandas as pd
 import sys
 from scipy.spatial import cKDTree
 
-#################################################################
-# compute_overdensity
-################################################################
 
+class OverdensityCalculator:
+    """Compute local overdensity delta_R for each halo using a periodic KDTree."""
 
-def compute_overdensity(
-    df: pd.DataFrame,
-    radius: float = 5.0,
-    tree: cKDTree | None = None,
-    box_size: float = 1000.0,
-    mass_column: str = "mvir"
-) -> pd.DataFrame:
-    """
-    Compute the local overdensity delta_R for each halo using a periodic KDTree.
+    PROGRESS_INTERVAL = 500000
 
-    Parameters
-    ----------
-    df : DataFrame
-        Halo catalog containing 'x', 'y', 'z', and mass column.
-    radius : float
-        Sphere radius in h^-1 Mpc.
-    tree : cKDTree
-        Pre-built tree (optional). 
-    box_size : float
-        Size of the simulation box in h^-1 Mpc.
-    mass_column : str
-        Column representing halo mass (default 'mvir').
+    def __init__(
+        self,
+        radius: float,
+        box_size: float,
+        tree: cKDTree,
+        mass_column: str = "mvir",
+    ):
+        if tree is None:
+            sys.exit("No tree provided. Please provide a pre-built cKDTree.")
+        self.radius = radius
+        self.box_size = box_size
+        self.tree = tree
+        self.mass_column = mass_column
 
-    Returns
-    -------
-    df : DataFrame
-        Same DataFrame with an added column delta_{radius}.
-    """
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add column ``delta_{radius}`` to df, or return df unchanged if it exists.
 
-    delta_col = f"delta_{int(radius)}"
+        Parameters
+        ----------
+        df : DataFrame
+            Halo catalog containing 'x', 'y', 'z', and mass column.
 
-    # --- Early skip if overdensity was already computed ---
-    if delta_col in df.columns:
-        print(f"[INFO] Column '{delta_col}' already exists. Skipping computation.")
+        Returns
+        -------
+        df : DataFrame
+            Same DataFrame with an added column delta_{radius}.
+        """
+        delta_col = f"delta_{int(self.radius)}"
+
+        if delta_col in df.columns:
+            print(f"[INFO] Column '{delta_col}' already exists. Skipping computation.")
+            return df
+
+        box_volume = self.box_size ** 3
+        total_mass = df[self.mass_column].sum()
+        rho_mean = total_mass / box_volume
+        print(f"Mean mass density: {rho_mean:.3e}")
+
+        overdensity = np.zeros(len(df), dtype=np.float64)
+        V_R = (4.0 / 3.0) * np.pi * self.radius ** 3
+
+        print(f"Computing overdensity for R = {self.radius} h^-1 Mpc...")
+        positions = df[['x', 'y', 'z']].values
+
+        for i in range(len(df)):
+            indices = self.tree.query_ball_point(positions[i], self.radius)
+            local_mass = df.iloc[indices][self.mass_column].sum()
+            overdensity[i] = (local_mass / V_R - rho_mean) / rho_mean
+
+            if i % self.PROGRESS_INTERVAL == 0 and i > 0:
+                print(f"  Processed {i:,} halos...")
+
+        print("Done computing overdensity.")
+
+        df[delta_col] = overdensity
         return df
-
-    # --- If tree not provided ---
-    if tree is None:
-        sys.exit("No tree provided. Please provide a pre-built cKDTree.")
-
-    # --- Mean mass density ---
-    box_volume = box_size**3
-    total_mass = df[mass_column].sum()
-    rho_mean = total_mass / box_volume
-    print(f"Mean mass density: {rho_mean:.3e}")
-
-    # --- Prepare output ---
-    overdensity = np.zeros(len(df), dtype=np.float64)
-    V_R = (4.0 / 3.0) * np.pi * radius**3
-
-    print(f"Computing overdensity for R = {radius} h^-1 Mpc...")
-    positions = df[['x', 'y', 'z']].values
-
-    # --- For-loop over halos ---
-    for i in range(len(df)):
-        pos = positions[i]
-
-        # periodic tree search
-        indices = tree.query_ball_point(pos, radius)
-
-        local_mass = df.iloc[indices][mass_column].sum()
-        rho_local = local_mass / V_R
-
-        overdensity[i] = (rho_local - rho_mean) / rho_mean
-
-        if i % 500000 == 0 and i > 0:
-            print(f"  Processed {i:,} halos...")
-
-    print("Done computing overdensity.")
-
-    # --- Store result ---
-    df[delta_col] = overdensity
-    return df

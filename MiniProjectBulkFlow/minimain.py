@@ -10,8 +10,8 @@ from scipy.spatial import cKDTree
 
 # --- Local modules ---
 from src.data_loader import load_rockstar_catalog, load_cf4_catalogue
-from src.overdensity import compute_overdensity
-from src.masks import make_cf4_mask, make_uniform_mask
+from src.overdensity import OverdensityCalculator
+from src.masks import MaskMaker
 from src.bulkflow import calculate_bulk_flow_series, calculate_local_bulkflow
 from src.specific_utils import append_bulkflow_results, save_average_bulkflow_to_csv
 from src.visualize import plot_bulkflow_from_csv, plot_bulkflow_from_hdf5, plot_histogram, plot_simulation_slice_heatmap

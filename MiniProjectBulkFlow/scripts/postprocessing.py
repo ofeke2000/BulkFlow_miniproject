@@ -10,20 +10,21 @@ import logging
 
 from src.specific_utils import save_average_bulkflow_to_csv
 from src.visualize import plot_bulkflow_from_csv
+from src.classes import AppConfig
 
 
-def aggregate_results(cfg: dict):
+def aggregate_results(cfg: AppConfig):
     """
     Aggregate bulk flow results from multiple HDF5 files into a unified CSV.
 
     Parameters:
-        cfg: Configuration dictionary
+        cfg: AppConfig instance
     """
-    base_dir = cfg["paths"]["output_folder"]
+    base_dir = cfg.paths.output_folder
     csv_file = os.path.join(base_dir, "unified_results.csv")
+    pp = cfg.postprocessing
 
-    # Define velocity band edges (adjust as needed)
-    band_edges = np.arange(0, 1600, 100)
+    band_edges = np.arange(pp.band_min, pp.band_max, pp.band_step)
 
     for low, high in zip(band_edges[:-1], band_edges[1:]):
         def clean_float(x: float) -> float:
@@ -45,21 +46,24 @@ def aggregate_results(cfg: dict):
                 csv_file=csv_file,
                 column_name=column_name,
                 mask_type="full",
-                key="bulkflow"
+                key="bulkflow",
+                cosmology_cfg=cfg.cosmology,
+                theory_cfg=cfg.theory,
             )
         else:
             logging.warning(f"HDF5 file not found: {hdf_file}")
 
 
-def create_final_plots(cfg: dict):
+def create_final_plots(cfg: AppConfig):
     """
     Create final comparison plots from aggregated results.
 
     Parameters:
-        cfg: Configuration dictionary
+        cfg: AppConfig instance
     """
-    base_dir = cfg["paths"]["output_folder"]
+    base_dir = cfg.paths.output_folder
     csv_file = os.path.join(base_dir, "unified_results.csv")
+    pp = cfg.postprocessing
 
     if not os.path.exists(csv_file):
         logging.error(f"Unified CSV file not found: {csv_file}")
@@ -69,12 +73,14 @@ def create_final_plots(cfg: dict):
         csv_file=csv_file,
         output_folder=base_dir,
         variable_name="local_bulkflow",
-        var_min=0,
-        var_max=1500,
-        var_step=100,
+        var_min=pp.var_min,
+        var_max=pp.var_max,
+        var_step=pp.var_step,
         output_file="bulkflow_comparison.png",
         plot_theory=True,
         plot_errors=False,
-        error_alpha=0.25,
+        error_alpha=pp.error_alpha,
         show_markers=False,
+        cosmology_cfg=cfg.cosmology,
+        style=cfg.visualization.style,
     )

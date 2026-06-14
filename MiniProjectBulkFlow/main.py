@@ -85,7 +85,10 @@ def main():
         use_mean_amplitude=True,
         plot_variance_band=True,
         show_markers=False,
-        plot_all_curves=False
+        plot_all_curves=False,
+        cosmology_cfg=cfg.cosmology,
+        theory_cfg=cfg.theory,
+        style=cfg.visualization.style,
     )
 
     # ==========================================================

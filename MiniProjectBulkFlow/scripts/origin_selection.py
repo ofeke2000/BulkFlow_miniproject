@@ -71,9 +71,11 @@ def select_origin_points(halos_df: pd.DataFrame, cfg: AppConfig) -> pd.DataFrame
         output_folder=output_folder,
         output_file=f"overdensity_histogram_[{bulkflow_lower_cut:.0f}<local_V<{bulkflow_upper_cut:.0f}]_for_candidates.png",
         key=delta_column,
-        origin=(0,0,0),
-        bins=20,
-        log_axis="none"
+        origin=cfg.visualization.plot_histogram_origin,
+        bins=cfg.visualization.style.mass_histogram_bins,
+        box_size=cfg.MDPL2.box_size,
+        log_axis="none",
+        style=cfg.visualization.style,
     )
 
     # Select origins
@@ -92,9 +94,11 @@ def select_origin_points(halos_df: pd.DataFrame, cfg: AppConfig) -> pd.DataFrame
         output_folder=output_folder,
         output_file=f"overdensity_histogram_[{bulkflow_lower_cut:.0f}<local_V<{bulkflow_upper_cut:.0f}]_for_selected_points.png",
         key=delta_column,
-        origin=(0,0,0),
-        bins=20,
-        log_axis="none"
+        origin=cfg.visualization.plot_histogram_origin,
+        bins=cfg.visualization.style.mass_histogram_bins,
+        box_size=cfg.MDPL2.box_size,
+        log_axis="none",
+        style=cfg.visualization.style,
     )
 
     logging.info(f"Selected {len(selected_points)} origin points")

@@ -5,6 +5,7 @@ import os
 from typing import Any
 
 from .bulkflow_config import BulkFlowConfig
+from .cosmology_config import CosmologyConfig
 from .mdpl2_config import MDPL2Config
 from .origin_config import OriginConfig
 from .paths_config import (
@@ -15,12 +16,17 @@ from .paths_config import (
     PathsConfig,
 )
 from .postprocessing_config import PostprocessingConfig
+from .theory_config import TheoryConfig
+from .virgo_config import VirgoTestConfig
 from .visualization_config import SimulationSliceHeatmapConfig, VisualizationConfig
 
 
 @dataclass
 class AppConfig:
     MDPL2: MDPL2Config = MDPL2Config()
+    cosmology: CosmologyConfig = CosmologyConfig()
+    theory: TheoryConfig = TheoryConfig()
+    virgo_test: VirgoTestConfig = VirgoTestConfig()
     paths: PathsConfig = PathsConfig()
     bulkflow: BulkFlowConfig = BulkFlowConfig()
     origin_configs: OriginConfig = OriginConfig()
@@ -59,6 +65,9 @@ class AppConfig:
         visualization = config.get("visualization", {})
         return cls(
             MDPL2=MDPL2Config(**config.get("MDPL2", {})),
+            cosmology=CosmologyConfig(),
+            theory=TheoryConfig(**config.get("theory", {})),
+            virgo_test=VirgoTestConfig(**config.get("virgo_test", {})),
             paths=paths,
             bulkflow=BulkFlowConfig(**config.get("bulkflow", {})),
             origin_configs=OriginConfig(**config.get("origin_configs", {})),

@@ -4,7 +4,13 @@ import pandas as pd
 import os
 
 from .theoretical_bulkflow import theoretical_bulkflow_colossus
+from .config.bulkflow_config import BulkFlowConfig
+from .config.cosmology_config import CosmologyConfig
+from .config.mdpl2_config import MDPL2Config
+from .config.theory_config import TheoryConfig
 
+ORIGIN_EPS = 1e-8
+HDF5_MASK_MIN_ITEMSIZE = {"mask": 8}
 
 # ================================================================
 # Periodic distance computations
@@ -101,15 +107,15 @@ def add_periodic_distance(
 def radial_velocity_and_error_pbc(
         halos_df: pd.DataFrame,
         origin: tuple[float, float, float],
-        box_size: float = 1000.0,
-        error_frac: float = 0.20,
-        min_sigma: float = 50.0) -> pd.DataFrame:
+        box_size: float | None = None,
+        error_frac: float | None = None,
+        min_sigma: float | None = None) -> pd.DataFrame:
     """
     Compute line-of-sight unit vectors r_hat, radial velocities v_rad,
     per-object errors sigma, and PBC radius.
-    
+
     Includes full periodic boundary conditions.
-    
+
     New columns added:
         radius
         rhat_x, rhat_y, rhat_z
@@ -121,6 +127,13 @@ def radial_velocity_and_error_pbc(
     if not all(col in halos_df.columns for col in required):
         raise ValueError(f"halos_df must contain columns: {required}")
 
+    if box_size is None:
+        box_size = MDPL2Config().box_size
+    if error_frac is None:
+        error_frac = BulkFlowConfig().error_fraction
+    if min_sigma is None:
+        min_sigma = BulkFlowConfig().sigma_min
+
     pos = halos_df[['x', 'y', 'z']].values.astype(float)
     vel = halos_df[['vx', 'vy', 'vz']].values.astype(float)
     origin = np.array(origin, dtype=float)
@@ -129,7 +142,7 @@ def radial_velocity_and_error_pbc(
     # Apply periodic displacement
     # -----------------------------
     disp = pos - origin   # naïve displacement
-    
+
     # Minimum‐image convention (PBC)
     disp -= box_size * np.round(disp / box_size)
 
@@ -139,9 +152,8 @@ def radial_velocity_and_error_pbc(
     # Handle halos exactly at the origin
     zero_mask = (r_norm == 0.0)
     if np.any(zero_mask):
-        # print(f"Warning: {zero_mask.sum()} halos at origin — adding tiny offset")
-        r_norm[zero_mask] = 1e-8
-        disp[zero_mask] += 1e-8
+        r_norm[zero_mask] = ORIGIN_EPS
+        disp[zero_mask] += ORIGIN_EPS
 
     # Unit vector r̂
     r_hat = disp / r_norm[:, None]
@@ -207,7 +219,7 @@ def append_bulkflow_results(
 
     # Ensure correct dtypes
     df_to_store["origin_id"] = df_to_store["origin_id"].astype(int)
-    df_to_store["mask"] = df_to_store["mask"].astype(str)  # will set min_itemsize later
+    df_to_store["mask"] = df_to_store["mask"].astype(str)
     df_to_store[["radius", "u_x", "u_y", "u_z", "U_total"]] = df_to_store[
         ["radius", "u_x", "u_y", "u_z", "U_total"]
     ].astype(float)
@@ -221,10 +233,10 @@ def append_bulkflow_results(
     df_to_store.to_hdf(
         filename,
         key="bulkflow",
-        format="table",     # allow append and filtering
-        mode="a",           # append mode
+        format="table",
+        mode="a",
         append=True,
-        min_itemsize={"mask": 8}  # set large enough to hold all strings
+        min_itemsize=HDF5_MASK_MIN_ITEMSIZE,
     )
 
 
@@ -237,12 +249,18 @@ def save_average_bulkflow_to_csv(
     csv_file: str,
     column_name: str,
     mask_type: str = "full",
-    key: str = "bulkflow"
+    key: str = "bulkflow",
+    cosmology_cfg: CosmologyConfig = None,
+    theory_cfg: TheoryConfig = None,
 ) -> None:
     """
     Calculate mean and std bulk flow per radius (averaged over origins)
     and store them as band-specific columns in a CSV file.
     """
+    if cosmology_cfg is None:
+        cosmology_cfg = CosmologyConfig()
+    if theory_cfg is None:
+        theory_cfg = TheoryConfig()
 
     if not os.path.exists(hdf_file):
         print(f"Error: HDF5 file {hdf_file} not found.")
@@ -273,10 +291,12 @@ def save_average_bulkflow_to_csv(
 
         radii = stats["radius"].values
         target_df = pd.DataFrame({"radius": stats["radius"].values})
-    # Add theoretical columns if not present
-        sigma_v = theoretical_bulkflow_colossus(radii=radii)
-        target_df["U_mean_theory"] = np.sqrt(8 / (3 * np.pi)) * sigma_v
-
+        sigma_v = theoretical_bulkflow_colossus(
+            radii=radii,
+            cosmology_cfg=cosmology_cfg,
+            theory_cfg=theory_cfg,
+        )
+        target_df["U_mean_theory"] = cosmology_cfg.bulk_flow_amplitude_factor * sigma_v
 
     # Rename columns to encode overdensity band
     stats = stats.rename(

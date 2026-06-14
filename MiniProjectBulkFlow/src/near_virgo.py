@@ -3,13 +3,13 @@ import pandas as pd
 from scipy.spatial import cKDTree
 import logging
 
+from .config.virgo_config import VirgoTestConfig
+
 
 def near_virgo(
     df: pd.DataFrame,
-    box_size: float = 1000.0,
-    mass_threshold: float = 1e14,
-    r_min: float = 10.0,
-    r_max: float = 20.0,
+    box_size: float,
+    virgo_cfg: VirgoTestConfig = None,
     column_name: str = "near_virgo"
 ) -> pd.DataFrame:
     """
@@ -24,10 +24,8 @@ def near_virgo(
         Halo catalog with columns ['x','y','z','mvir']
     box_size : float
         Periodic box size
-    mass_threshold : float
-        Mass threshold for Virgo-like halos
-    r_min, r_max : float
-        Distance shell for Virgo test
+    virgo_cfg : VirgoTestConfig, optional
+        Test parameters. Defaults to VirgoTestConfig() values.
     column_name : str
         Name of output column
 
@@ -36,6 +34,12 @@ def near_virgo(
     pandas.DataFrame
         Updated dataframe with column `column_name`
     """
+    if virgo_cfg is None:
+        virgo_cfg = VirgoTestConfig()
+
+    mass_threshold = virgo_cfg.mass_threshold
+    r_min = virgo_cfg.r_min
+    r_max = virgo_cfg.r_max
 
     # --------------------------------------------------
     # 0. Skip if column already exists
@@ -72,7 +76,7 @@ def near_virgo(
     # 3. Query for each halo
     # --------------------------------------------------
     positions = df[["x", "y", "z"]].values
-    near_virgo = np.zeros(len(df), dtype=np.int8)
+    near_virgo_flags = np.zeros(len(df), dtype=np.int8)
 
     for i, pos in enumerate(positions):
         # Find massive halos within r_max
@@ -88,15 +92,15 @@ def near_virgo(
 
         # Check shell condition
         if np.any((distances >= r_min) & (distances <= r_max)):
-            near_virgo[i] = 1
+            near_virgo_flags[i] = 1
 
     # --------------------------------------------------
     # 4. Attach column
     # --------------------------------------------------
-    df[column_name] = near_virgo
+    df[column_name] = near_virgo_flags
 
     logging.info(
-        f"Virgo test complete: {near_virgo.sum()} / {len(df)} halos flagged."
+        f"Virgo test complete: {near_virgo_flags.sum()} / {len(df)} halos flagged."
     )
 
     return df

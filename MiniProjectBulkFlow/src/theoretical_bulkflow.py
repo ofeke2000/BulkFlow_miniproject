@@ -2,13 +2,16 @@ import numpy as np
 from scipy.integrate import quad
 from colossus.cosmology import cosmology
 
+from .config.cosmology_config import CosmologyConfig
+from .config.theory_config import TheoryConfig
+
+WINDOW_EPS = 1e-12
+
 
 def theoretical_bulkflow_colossus(
     radii: np.ndarray,
-    z: float = 0.0,
-    k_min: float = 1e-4,
-    k_max: float = 10.0,
-    k_limit: int = 200000
+    cosmology_cfg: CosmologyConfig = None,
+    theory_cfg: TheoryConfig = None,
 ) -> np.ndarray:
     """
     Compute the theoretical RMS bulk flow using Colossus (ΛCDM).
@@ -17,70 +20,48 @@ def theoretical_bulkflow_colossus(
     ----------
     radii : array-like
         Radii in h⁻¹ Mpc.
-    cosmo_params : dict
-        Colossus cosmology parameters.
-    z : float
-        Redshift (default: 0).
-    k_min, k_max : float
-        Integration limits in h/Mpc.
-    k_limit : int
-        Max subintervals for quad integration.
+    cosmology_cfg : CosmologyConfig, optional
+        Simulation cosmology parameters. Defaults to MDPL2 values.
+    theory_cfg : TheoryConfig, optional
+        Integration settings. Defaults to standard values.
 
     Returns
     -------
     sigma_v : np.ndarray
         RMS bulk flow [km/s] at each radius.
     """
+    if cosmology_cfg is None:
+        cosmology_cfg = CosmologyConfig()
+    if theory_cfg is None:
+        theory_cfg = TheoryConfig()
 
-    # Define your simulation's cosmology parameters
-    my_cosmo_params = {
-        'flat': True,
-        'H0': 67.77,
-        'Om0': 0.307115,
-        'Ode0': 0.692885,
-        'Ob0': 0.048206,
-        'sigma8': 0.8228,
-        'ns': 0.96
-    }
-
-    # Register the custom cosmology in Colossus
-    cosmology.addCosmology('mySimCosmo', my_cosmo_params)
+    cosmology.addCosmology('mySimCosmo', cosmology_cfg.to_colossus_dict())
     cosmology.setCosmology('mySimCosmo')
     cosmo = cosmology.getCurrent()
 
-    # Growth rate f ≈ Ω_m(z)^0.55
-    f = cosmo.Om(z)**0.55
+    f = cosmo.Om(theory_cfg.z) ** cosmology_cfg.growth_index
     H0 = cosmo.H0  # km/s/Mpc
 
-    # --------------------------------------------------
-    # Top-hat window function
-    # --------------------------------------------------
     def W(k, R):
         x = k * R
-        return 3.0 * (np.sin(x) - x * np.cos(x)) / (x**3 + 1e-12)
+        return 3.0 * (np.sin(x) - x * np.cos(x)) / (x**3 + WINDOW_EPS)
 
-    # --------------------------------------------------
-    # Integrand
-    # --------------------------------------------------
     def integrand(k, R):
-        pk = cosmo.matterPowerSpectrum(k, z)
+        pk = cosmo.matterPowerSpectrum(k, theory_cfg.z)
         return pk * W(k, R)**2
 
-    # --------------------------------------------------
-    # Compute σ_v(R)
-    # --------------------------------------------------
     sigma_v = []
 
     for R in radii:
         integral, _ = quad(
             integrand,
-            k_min,
-            k_max,
+            theory_cfg.k_min,
+            theory_cfg.k_max,
             args=(R,),
-            limit=k_limit
+            limit=theory_cfg.k_limit
         )
 
         sigma2_v = (H0**2 * f**2 / (2.0 * np.pi**2)) * integral
-        sigma_v.append(np.sqrt(sigma2_v))  # RMS velocity
+        sigma_v.append(np.sqrt(sigma2_v))
 
     return np.array(sigma_v)

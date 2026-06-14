@@ -5,28 +5,31 @@ Compute environmental properties for halos: overdensity, Virgo proximity, local 
 """
 
 import logging
+import pandas as pd
 from scipy.spatial import cKDTree
 
-from src.overdensity import compute_overdensity
+from src.overdensity import OverdensityCalculator
 from src.near_virgo import near_virgo
 from src.bulkflow import calculate_local_bulkflow
+from src.classes import AppConfig
 
 
-def compute_environmental_tests(halos_df: pd.DataFrame, tree: cKDTree, cfg: dict) -> pd.DataFrame:
+def compute_environmental_tests(halos_df: pd.DataFrame, tree: cKDTree, cfg: AppConfig) -> pd.DataFrame:
     """
     Compute environmental tests for halos.
 
     Parameters:
         halos_df: Halo catalog DataFrame
         tree: cKDTree for spatial queries
-        cfg: Configuration dictionary
+        cfg: AppConfig instance
 
     Returns:
         Updated halos_df with environmental columns
     """
-    box_size = cfg["MDPL2"]["box_size"]
-    radius_overdensity = cfg["origin_configs"]["local_overdensity_radius"]
-    radius_bulkflow = cfg["origin_configs"]["local_bulkflow_radius"]
+    box_size = cfg.MDPL2.box_size
+    radius_overdensity = cfg.origin_configs.local_overdensity_radius
+    radius_bulkflow = cfg.origin_configs.local_bulkflow_radius
+    use_virgo = cfg.origin_configs.use_virgo_criteria
 
     delta_column = f"delta_{int(radius_overdensity)}"
     virgo_column = "near_virgo"
@@ -36,7 +39,7 @@ def compute_environmental_tests(halos_df: pd.DataFrame, tree: cKDTree, cfg: dict
     missing_tests = []
     if delta_column not in halos_df.columns:
         missing_tests.append("overdensity")
-    if virgo_column not in halos_df.columns:
+    if use_virgo and virgo_column not in halos_df.columns:
         missing_tests.append("virgo")
     if bulkflow_column not in halos_df.columns:
         missing_tests.append("bulkflow")
@@ -50,13 +53,12 @@ def compute_environmental_tests(halos_df: pd.DataFrame, tree: cKDTree, cfg: dict
     # Compute overdensity
     if "overdensity" in missing_tests:
         logging.info(f"Computing overdensity ({delta_column})...")
-        halos_df = compute_overdensity(
-            df=halos_df,
+        calculator = OverdensityCalculator(
             radius=radius_overdensity,
-            tree=tree,
             box_size=box_size,
-            mass_column="mvir"
+            tree=tree,
         )
+        halos_df = calculator.compute(halos_df)
         logging.info("Overdensity computed.")
 
     # Compute Virgo proximity
@@ -65,9 +67,7 @@ def compute_environmental_tests(halos_df: pd.DataFrame, tree: cKDTree, cfg: dict
         halos_df = near_virgo(
             df=halos_df,
             box_size=box_size,
-            mass_threshold=1e14,  # h^-1 Msun
-            r_min=7.0,  # h^-1 Mpc
-            r_max=14.0  # h^-1 Mpc
+            virgo_cfg=cfg.virgo_test,
         )
         logging.info("Virgo test completed.")
 

@@ -35,6 +35,7 @@ import pandas as pd
 import logging
 from scipy.spatial import cKDTree
 from scipy.linalg import lu_factor, lu_solve
+from .config.bulkflow_config import BulkFlowConfig
 from .specific_utils import radial_velocity_and_error_pbc
 
 ###########################################################################
@@ -47,7 +48,7 @@ def bulk_flow_chi2_cumulative(
     r_list: list,
     v_rad: np.ndarray,
     sigma: np.ndarray,
-    sigma_star: float = 250.0
+    sigma_star: float | None = None
 ) -> pd.DataFrame:
     """
     Cumulative chi^2 bulk-flow estimator.
@@ -74,6 +75,9 @@ def bulk_flow_chi2_cumulative(
     """
 
     r_list = np.asarray(r_list)
+
+    if sigma_star is None:
+        sigma_star = BulkFlowConfig().sigma_star
 
     # Total variance
     sigma2 = sigma**2 + sigma_star**2
@@ -150,7 +154,7 @@ def bulk_flow_mean_cumulative(
     r_list: list,
     v_rad: np.ndarray,
     sigma: np.ndarray,
-    sigma_star: float = 250.0
+    sigma_star: float | None = None
 ) -> pd.DataFrame:
     """
     Cumulative mean bulk-flow estimator.
@@ -170,6 +174,9 @@ def bulk_flow_mean_cumulative(
     """
 
     r_list = np.asarray(r_list)
+
+    if sigma_star is None:
+        sigma_star = BulkFlowConfig().sigma_star
 
     results = []
     idx = 0
@@ -217,10 +224,11 @@ def calculate_bulk_flow_series(
     r_max: float,
     r_min: float,
     r_jumps: float,
+    box_size: float,
     calculation_method: str = "chi2",
-    error_frac: float = 0.20,
-    sigma_star: float = 250.0,
-    sigma_min: float = 50.0
+    error_frac: float | None = None,
+    sigma_star: float | None = None,
+    sigma_min: float | None = None
 ):
     """
     Compute the bulk flow as a function of radius, using the series (incremental)
@@ -249,13 +257,20 @@ def calculate_bulk_flow_series(
         Columns: [radius, u_x, u_y, u_z, U_total]
     """
 
+    if error_frac is None:
+        error_frac = BulkFlowConfig().error_fraction
+    if sigma_star is None:
+        sigma_star = BulkFlowConfig().sigma_star
+    if sigma_min is None:
+        sigma_min = BulkFlowConfig().sigma_min
+
     # ---------------------------------------------------------
     # (1) Compute radial velocity, error, radii, unit vector
     # ---------------------------------------------------------
     halos_df = radial_velocity_and_error_pbc(
             halos_df,
             origin=origin,
-            box_size=1000.0,
+            box_size=box_size,
             error_frac=error_frac,
             min_sigma=sigma_min
         )

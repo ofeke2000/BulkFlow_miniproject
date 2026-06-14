@@ -23,7 +23,8 @@ python main.py
 - All tunable parameters live in `MiniProjectBulkFlow/config.yaml`, loaded into the dataclasses
   in `src/config/`.
 - `minimain.py` is a personal scratch script for ad-hoc analyses — not a stable entry point;
-  don't treat its contents as load-bearing.
+  don't treat its contents as load-bearing. **Do not read or modify `minimain.py` unless the
+  user explicitly asks.**
 
 ## Code layout
 
@@ -34,6 +35,11 @@ python main.py
 - `MiniProjectBulkFlow/src/config/` — config dataclasses mirroring config.yaml
 - `data/` — input catalogs (Rockstar halos, CF4); large CSVs, don't load fully unless needed
 - `output/` — results (HDF5 per run) and plots
+
+## Coding conventions
+
+- **Prefer classes.** When adding new logic, prefer encapsulating it in a class rather than standalone functions or module-level code.
+- **No bare numbers in pipeline code.** Any numeric literal introduced anywhere in the pipeline must live either in a class attribute or in `config.yaml` — never inline. For every new number, ask the user whether it belongs in a class or in the config before writing any code.
 
 ## Hard rules
 

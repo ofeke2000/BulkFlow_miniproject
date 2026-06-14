@@ -11,6 +11,11 @@ import yaml
 from .data_loader import load_cf4_catalogue, load_rockstar_catalog
 from .specific_utils import add_periodic_distance
 from .theoretical_bulkflow import theoretical_bulkflow_colossus
+from .config import AppConfig
+from .config.cosmology_config import CosmologyConfig
+from .config.theory_config import TheoryConfig
+from .config.mdpl2_config import MDPL2Config
+from .config.visualization_config import PlotStyleConfig, SimulationSliceHeatmapConfig, VisualizationConfig
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -22,9 +27,9 @@ def load_config(path: str = "config.yaml") -> dict:
     logging.info(f"Loading config from {path}")
     with open(path, "r") as f:
         return yaml.safe_load(f)
-    
+
 def visualize ():
-    
+
     plot_bulkflow=False
 
     plot_histogram_bool=True
@@ -34,14 +39,14 @@ def visualize ():
     # ===========================================
     # 1. Load configuration
     # ===========================================
-    cfg = load_config("config.yaml")
+    cfg = AppConfig.from_dict(load_config("config.yaml"))
 
-    output_folder = cfg["paths"]["output_folder"]
-    output_file = cfg["paths"]["output_file"]
-    
-    n_origins = cfg["origin_configs"]["number_of_origins"]
-    radius_overdensity = int(cfg["origin_configs"]["local_overdensity_radius"])
-    radius_bulkflow = int(cfg["origin_configs"]["local_bulkflow_radius"])
+    output_folder = cfg.paths.output_folder
+    output_file = cfg.paths.output_file
+
+    n_origins = cfg.origin_configs.number_of_origins
+    radius_overdensity = int(cfg.origin_configs.local_overdensity_radius)
+    radius_bulkflow = int(cfg.origin_configs.local_bulkflow_radius)
 
     # ===========================================
     # 2. Plot whatever is requested
@@ -56,16 +61,18 @@ def visualize ():
             plot_theory=True,
             use_mean_amplitude=True,
             plot_variance_band=True,
-            variance_alpha=0.25,
-            plot_all_curves=False,
             show_markers=False,
+            plot_all_curves=False,
+            cosmology_cfg=cfg.cosmology,
+            theory_cfg=cfg.theory,
+            style=cfg.visualization.style,
         )
 
     if plot_histogram_bool:
 
         if import_MDPL2:
 
-            path=cfg["paths"]["rockstar_catalog"]
+            path=cfg.paths.rockstar_catalog
             rockstar_df = load_rockstar_catalog(
                 path=path
             )
@@ -76,29 +83,23 @@ def visualize ():
             virgo_column = "near_virgo"
             bulkflow_column = f"bulkflow_{int(radius_bulkflow)}"
 
-            # mask = (
-            #     (rockstar_df[delta_column].between(- 1e-4, 1e-4)) #&
-            #     #(rockstar_df[bulkflow_column].between(400.0, 600.0)) &
-            #     #(rockstar_df[virgo_column] > 0)
-            # )
-
-            # candidates = rockstar_df.loc[mask]
-            
             rockstar_df['mvir'] = np.log10(rockstar_df['mvir'])
-            data_df = rockstar_df 
+            data_df = rockstar_df
 
         logging.info(f"Plotting histogram for column: {key}")
         logging.info(f"Number of entries: {len(data_df)} out of {len(rockstar_df)}")
-        
+
 
         plot_histogram(
-        data_df=data_df, 
-        output_folder=output_folder, 
-        output_file="Mass Histogram.png", 
+        data_df=data_df,
+        output_folder=output_folder,
+        output_file="Mass Histogram.png",
         key=key,
-        origin=(0,0,0),
-        bins=20,
-        log_axis="y"
+        origin=cfg.visualization.plot_histogram_origin,
+        bins=cfg.visualization.style.mass_histogram_bins,
+        box_size=cfg.MDPL2.box_size,
+        log_axis="y",
+        style=cfg.visualization.style,
         )
 
 
@@ -110,9 +111,12 @@ def plot_bulkflow_from_hdf5(
     plot_theory: bool = True,
     use_mean_amplitude: bool = True,
     plot_variance_band: bool = False,
-    variance_alpha: float = 0.25,
+    variance_alpha: float = None,
     plot_all_curves: bool = False,
     show_markers: bool = True,
+    cosmology_cfg: CosmologyConfig = None,
+    theory_cfg: TheoryConfig = None,
+    style: PlotStyleConfig = None,
 ) -> None:
     """
     Plot bulk flow results from an HDF5 file.
@@ -124,6 +128,14 @@ def plot_bulkflow_from_hdf5(
     show_markers : bool
         If False, suppress markers (dots) on curves.
     """
+    if cosmology_cfg is None:
+        cosmology_cfg = CosmologyConfig()
+    if theory_cfg is None:
+        theory_cfg = TheoryConfig()
+    if style is None:
+        style = PlotStyleConfig()
+    if variance_alpha is None:
+        variance_alpha = style.curve_alpha
 
     # --------------------------------------------------
     # Load data
@@ -138,7 +150,7 @@ def plot_bulkflow_from_hdf5(
     marker_uniform = "s" if show_markers else None
     marker_full = "D" if show_markers else None
 
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=style.bulkflow_figsize)
 
     # ==================================================
     # OPTION 1: plot ALL curves (no averaging)
@@ -150,8 +162,8 @@ def plot_bulkflow_from_hdf5(
                 d["radius"],
                 d["U_total"],
                 color="tab:blue",
-                alpha=0.25,
-                linewidth=1,
+                alpha=style.curve_alpha,
+                linewidth=style.curve_linewidth,
             )
 
         for origin_id, d in uniform_df.groupby("origin_id"):
@@ -159,8 +171,8 @@ def plot_bulkflow_from_hdf5(
                 d["radius"],
                 d["U_total"],
                 color="tab:orange",
-                alpha=0.25,
-                linewidth=1,
+                alpha=style.curve_alpha,
+                linewidth=style.curve_linewidth,
             )
 
         for origin_id, d in full_df.groupby("origin_id"):
@@ -168,8 +180,8 @@ def plot_bulkflow_from_hdf5(
                 d["radius"],
                 d["U_total"],
                 color="tab:green",
-                alpha=0.25,
-                linewidth=1,
+                alpha=style.curve_alpha,
+                linewidth=style.curve_linewidth,
             )
 
         cf4_label = "CF4 (all origins)"
@@ -252,10 +264,14 @@ def plot_bulkflow_from_hdf5(
     # --------------------------------------------------
     if plot_theory:
         radii = np.sort(df["radius"].unique())
-        sigma_v = theoretical_bulkflow_colossus(radii=radii)
+        sigma_v = theoretical_bulkflow_colossus(
+            radii=radii,
+            cosmology_cfg=cosmology_cfg,
+            theory_cfg=theory_cfg,
+        )
 
         if use_mean_amplitude:
-            U_theory = np.sqrt(8 / (3 * np.pi)) * sigma_v
+            U_theory = cosmology_cfg.bulk_flow_amplitude_factor * sigma_v
             theory_label = r"$\Lambda$CDM $\langle |U| \rangle$"
         else:
             U_theory = sigma_v
@@ -265,7 +281,7 @@ def plot_bulkflow_from_hdf5(
             radii,
             U_theory,
             "--",
-            linewidth=2,
+            linewidth=style.theory_linewidth,
             label=theory_label,
         )
 
@@ -280,19 +296,30 @@ def plot_bulkflow_from_hdf5(
     plt.tight_layout()
 
     os.makedirs(output_folder, exist_ok=True)
-    plt.savefig(os.path.join(output_folder, output_file), dpi=150)
+    plt.savefig(os.path.join(output_folder, output_file), dpi=style.dpi_normal)
     plt.close()
 
 
 def plot_histogram(
-        data_df, 
-        output_folder="plots", 
-        output_file="cf4_histogram_lin.png", 
+        data_df,
+        output_folder="plots",
+        output_file="cf4_histogram_lin.png",
         key="distance",
-        origin=(0,0,0),
-        bins=50,
-        log_axis= False   # NEW
+        origin: tuple[float, float, float] | None = None,
+        box_size: float | None = None,
+        bins=None,
+        log_axis=False,
+        style: PlotStyleConfig = None,
         ):
+
+    if style is None:
+        style = PlotStyleConfig()
+    if origin is None:
+        origin = VisualizationConfig().plot_histogram_origin
+    if box_size is None:
+        box_size = MDPL2Config().box_size
+    if bins is None:
+        bins = style.histogram_bins
 
     # Check for 'distance' column; calculate if missing
     if key == "distance" and key not in data_df.columns:
@@ -300,17 +327,17 @@ def plot_histogram(
             data_df = add_periodic_distance(
                 df=data_df,
                 origin=origin,
-                box_size=1000.0,
+                box_size=box_size,
                 distance_col="distance"
             )
         else:
             raise KeyError(
                 "The dataframe is missing 'distance' and cannot find 'x, y, z' to calculate it."
             )
-    
+
 
     # Plotting
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=style.histogram_figsize)
     plt.hist(data_df[key], bins=bins)
 
     if log_axis == "y":
@@ -324,11 +351,11 @@ def plot_histogram(
     plt.xlabel(key.replace("_", " ").capitalize())
     plt.ylabel("Number of Objects")
     plt.title(output_file.replace("_", " ").replace(".png", ""))
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.grid(True, linestyle='--', alpha=style.grid_alpha)
 
     os.makedirs(output_folder, exist_ok=True)
     output_path = os.path.join(output_folder, output_file)
-    plt.savefig(output_path, dpi=150)
+    plt.savefig(output_path, dpi=style.dpi_normal)
     plt.close()
 
 
@@ -343,6 +370,7 @@ def plot_simulation_slice_heatmap(
     output_folder: str = "heatmap_slices",
     output_file: str | None = None,
     dpi: int = 300,
+    heatmap_cfg: SimulationSliceHeatmapConfig | None = None,
 ) -> None:
     """
     Plot a hexbin heatmap of a thin slice of the simulation box.
@@ -389,7 +417,10 @@ def plot_simulation_slice_heatmap(
     # ---------------------------------------
     # Plot
     # ---------------------------------------
-    fig, ax = plt.subplots(figsize=(8, 8))
+    if heatmap_cfg is None:
+        heatmap_cfg = SimulationSliceHeatmapConfig()
+
+    fig, ax = plt.subplots(figsize=heatmap_cfg.heatmap_figsize)
 
     fig.patch.set_facecolor("black")
     ax.set_facecolor("black")
@@ -434,7 +465,7 @@ def plot_simulation_slice_heatmap(
 
 
 #=======================================================
-# plot 
+# plot
 #======================================================
 def plot_bulkflow_from_csv(
     csv_file: str,
@@ -446,8 +477,10 @@ def plot_bulkflow_from_csv(
     output_file: str | None = None,
     plot_theory: bool = True,
     plot_errors: bool = False,
-    error_alpha: float = 0.25,
+    error_alpha: float = None,
     show_markers: bool = False,
+    cosmology_cfg: CosmologyConfig = None,
+    style: PlotStyleConfig = None,
 ):
     """
     Generic bulk-flow plotting function conditioned on an arbitrary variable.
@@ -474,6 +507,13 @@ def plot_bulkflow_from_csv(
     import pandas as pd
     import matplotlib.pyplot as plt
     import matplotlib as mpl
+
+    if style is None:
+        style = PlotStyleConfig()
+    if error_alpha is None:
+        error_alpha = style.curve_alpha
+    if cosmology_cfg is None:
+        cosmology_cfg = CosmologyConfig()
 
     # --------------------------------------------------
     # Resolve output folder
@@ -531,7 +571,7 @@ def plot_bulkflow_from_csv(
 
     marker = "o" if show_markers else None
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=style.bulkflow_figsize)
 
     # --------------------------------------------------
     # Plot bands
@@ -546,7 +586,7 @@ def plot_bulkflow_from_csv(
             radii,
             df[mean_col],
             color=color,
-            linewidth=2,
+            linewidth=style.theory_linewidth,
             marker=marker,
         )
 
@@ -567,7 +607,7 @@ def plot_bulkflow_from_csv(
             radii,
             df["U_mean_theory"],
             "k--",
-            linewidth=2.5,
+            linewidth=style.csv_theory_linewidth,
             label=r"$\Lambda$CDM $\langle |U| \rangle$",
         )
         ax.legend()
@@ -593,6 +633,5 @@ def plot_bulkflow_from_csv(
     fig.tight_layout()
 
     os.makedirs(output_folder, exist_ok=True)
-    fig.savefig(os.path.join(output_folder, output_file), dpi=150)
+    fig.savefig(os.path.join(output_folder, output_file), dpi=style.dpi_normal)
     plt.close(fig)
-
