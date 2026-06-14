@@ -62,8 +62,12 @@ Computes bulk flow time series for selected origins. Supports configurable maski
 - "uniform": Uniform density mask
 - "all": Compute all mask types
 
+Writes all results to a single self-describing netCDF file via `BulkFlowDataset`.
+
 #### postprocessing.py
-Aggregates HDF5 results from bulk flow computations and generates final plots and summaries.
+Reads the netCDF output via `BulkFlowDataset.open()`, bands origins by the run's
+`selection_variable`, computes per-band mean/std of U_tot, and writes a unified CSV
+for plotting. Generates final comparison plots.
 
 ### src/
 
@@ -76,7 +80,21 @@ Package initializer to make src/ importable as a module.
 Functions for calculating bulk flow velocities from halo catalogs, including series computation over radial ranges.
 
 #### classes.py
-Custom classes for data structures (if any).
+Re-exports `AppConfig`, `Vector3D`, `BulkFlowResult`, and `BulkFlowDataset` as a
+single convenience namespace.
+
+#### data/ (sub-package)
+
+| Module | Purpose |
+|---|---|
+| `vector3d.py` | Immutable 3-D vector with PBC helpers |
+| `bulkflow_dataset.py` | `BulkFlowResult` dataclass (one origin/mask/method series) and `BulkFlowDataset` (4-D xarray accumulator, netCDF writer/reader) |
+| `bulkflow_result.py` | Legacy file — superseded by `bulkflow_dataset.py` |
+
+`BulkFlowDataset` dimensions: **origin × radius × mask × method**.
+Per-origin coordinates (extensible without schema migration): `origin_x/y/z`,
+`overdensity`, `local_bulkflow`, `mvir`, `near_virgo`.
+Dataset attrs carry full provenance: `selection_variable`, all run parameters, `git_commit`, `timestamp`.
 
 #### data_loader.py
 Functions for loading and preprocessing data from Rockstar and CF4 catalog files.

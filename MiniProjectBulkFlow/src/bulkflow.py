@@ -38,6 +38,8 @@ from scipy.linalg import lu_factor, lu_solve
 from .config.bulkflow_config import BulkFlowConfig
 from .specific_utils import radial_velocity_and_error_pbc
 
+_EYE3 = np.eye(3)  # pre-allocated identity for covariance computation
+
 ###########################################################################
 # Bulk flow series (cumulative chi^2 ML estimator)
 ###########################################################################
@@ -71,7 +73,10 @@ def bulk_flow_chi2_cumulative(
     Returns
     -------
     pandas.DataFrame
-        Columns: [radius, u_x, u_y, u_z, U_total]
+        Columns: [radius, u_x, u_y, u_z, U_total, sigma_U, n_used]
+        sigma_U is the propagated uncertainty on the bulk-flow magnitude:
+            sigma_U = sqrt(u^T · A^{-1} · u) / |u|
+        n_used is the cumulative count of halos used at each radius.
     """
 
     r_list = np.asarray(r_list)
@@ -104,10 +109,15 @@ def bulk_flow_chi2_cumulative(
 
         # Solve A u = b using LU decomposition
         try:
-
             lu, piv = lu_factor(A)
             u = lu_solve((lu, piv), b)
-            
+            U = np.linalg.norm(u)
+            if U > 0:
+                # Covariance of u is A^{-1}; propagate to scalar sigma_U
+                cov = lu_solve((lu, piv), _EYE3)
+                sigma_U = float(np.sqrt(u @ cov @ u)) / U
+            else:
+                sigma_U = np.nan
         except Exception:
             print("\n=== BULK FLOW SOLVER FAILURE ===")
             print(f"Radius R = {R}")
@@ -133,15 +143,14 @@ def bulk_flow_chi2_cumulative(
             print("================================\n")
 
             u = np.array([np.nan, np.nan, np.nan])
+            U = np.nan
+            sigma_U = np.nan
 
-
-        U = np.linalg.norm(u)
-
-        results.append([R, u[0], u[1], u[2], U])
+        results.append([R, u[0], u[1], u[2], U, sigma_U, idx])
 
     return pd.DataFrame(
         results,
-        columns=["radius", "u_x", "u_y", "u_z", "U_total"]
+        columns=["radius", "u_x", "u_y", "u_z", "U_total", "sigma_U", "n_used"]
     )
 
 ##########################################################################
@@ -170,7 +179,9 @@ def bulk_flow_mean_cumulative(
     Returns
     -------
     pandas.DataFrame
-        Columns: [radius, u_x, u_y, u_z, U_total]
+        Columns: [radius, u_x, u_y, u_z, U_total, sigma_U, n_used]
+        sigma_U is NaN for the mean estimator (no analytic covariance).
+        n_used is the cumulative count of halos at each radius.
     """
 
     r_list = np.asarray(r_list)
@@ -206,11 +217,11 @@ def bulk_flow_mean_cumulative(
 
         U = np.linalg.norm(u)
 
-        results.append([R, u[0], u[1], u[2], U])
+        results.append([R, u[0], u[1], u[2], U, np.nan, count])
 
     return pd.DataFrame(
         results,
-        columns=["radius", "u_x", "u_y", "u_z", "U_total"]
+        columns=["radius", "u_x", "u_y", "u_z", "U_total", "sigma_U", "n_used"]
     )
 
 
@@ -254,7 +265,7 @@ def calculate_bulk_flow_series(
     Returns
     -------
     velocities_df : DataFrame
-        Columns: [radius, u_x, u_y, u_z, U_total]
+        Columns: [radius, u_x, u_y, u_z, U_total, sigma_U, n_used]
     """
 
     if error_frac is None:

@@ -234,23 +234,24 @@ A u = b
 
 * Uses **LU decomposition**
 * Incremental accumulation by radius
-* Debugging on failure:
-
-  * determinant
-  * eigenvalues
-  * condition number
+* Propagates scalar uncertainty: `sigma_U = sqrt(uᵀ A⁻¹ u) / |u|`
+* Also records `n_used` (cumulative halo count at each radius)
+* Debugging on failure: determinant, eigenvalues, condition number
 
 Outputs per mask:
 
 ```python
-radius, u_x, u_y, u_z, U_total
+radius, u_x, u_y, u_z, U_total, sigma_U, n_used
 ```
 
-Saved to HDF5 with:
+Saved to a single **netCDF** file (via `BulkFlowDataset`) with dimensions:
 
-```python
-origin_id, mask
 ```
+origin × radius × mask × method
+```
+
+Per-origin coordinates stored alongside: `overdensity`, `local_bulkflow`, `mvir`, `near_virgo`, position.
+Dataset attrs carry full provenance (`selection_variable`, all run parameters, `git_commit`, `timestamp`).
 
 ---
 

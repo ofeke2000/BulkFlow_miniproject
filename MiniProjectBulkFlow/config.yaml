@@ -45,3 +45,4 @@ origin_configs:
 postprocessing:
   enabled: false
   build_comparison_plots: false
+  selection_variable: "overdensity"   # per-origin coord used to band results at plot time

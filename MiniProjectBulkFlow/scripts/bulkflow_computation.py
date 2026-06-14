@@ -1,25 +1,95 @@
 """
 bulkflow_computation.py
 -----------------------
-Compute bulk flows for selected origin points.
+Compute bulk flows for selected origin points and write results to a single
+self-describing netCDF file via BulkFlowDataset.
 """
 
+import subprocess
+import time
+from datetime import datetime
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 import logging
-import time
 from scipy.spatial import cKDTree
 
 from src.bulkflow import calculate_bulk_flow_series
 from src.classes import AppConfig, Vector3D
 from src.masks import MaskMaker
-from src.specific_utils import append_bulkflow_results
+from src.data.bulkflow_dataset import BulkFlowDataset, BulkFlowResult
 
 LOG_PERCENT_CADENCE = 5
 PERCENT_FACTOR = 100
 ETA_MIN_FACTOR = 60
+
+
+def _build_dataset_attrs(cfg: AppConfig) -> dict:
+    """Assemble provenance + configuration attributes for the Dataset."""
+    try:
+        git_commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        git_commit = "unknown"
+
+    oc = cfg.origin_configs
+    bf = cfg.bulkflow
+
+    return {
+        "selection_variable": cfg.postprocessing.selection_variable,
+        "sigma_star": bf.sigma_star,
+        "sigma_min": bf.sigma_min,
+        "error_fraction": bf.error_fraction,
+        "calculation_method": bf.calculation_method,
+        "box_size": cfg.MDPL2.box_size,
+        "min_radius": bf.min_radius,
+        "max_radius": bf.max_radius,
+        "radii_step": bf.radii_step,
+        "cf4_match_radius": bf.cf4_match_radius,
+        "cf4_match_max_doublings": bf.cf4_match_max_doublings,
+        "uniform_radius": bf.uniform_radius,
+        "selection_mass_min": float(oc.selection_mass_min or 0),
+        "selection_mass_max": float(oc.selection_mass_max or 0),
+        "number_of_origins": oc.number_of_origins,
+        "local_overdensity_radius": oc.local_overdensity_radius,
+        "local_bulkflow_radius": oc.local_bulkflow_radius,
+        "git_commit": git_commit,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+def _build_result(
+    bf_df: pd.DataFrame,
+    origin: Vector3D,
+    origin_id: int,
+    mask_name: str,
+    method: str,
+    row: pd.Series,
+    delta_col: str,
+    bulkflow_col: str,
+) -> BulkFlowResult:
+    """Construct a BulkFlowResult from a calculate_bulk_flow_series output."""
+    return BulkFlowResult(
+        origin_id=origin_id,
+        origin=origin,
+        mask=mask_name,
+        method=method,
+        overdensity=float(row.get(delta_col, np.nan)),
+        local_bulkflow=float(row.get(bulkflow_col, np.nan)),
+        mvir=float(row["mvir"]),
+        near_virgo=bool(row.get("near_virgo", False)),
+        radii=bf_df["radius"].values,
+        u_x=bf_df["u_x"].values,
+        u_y=bf_df["u_y"].values,
+        u_z=bf_df["u_z"].values,
+        U_tot=bf_df["U_total"].values,
+        sigma_U=bf_df["sigma_U"].values,
+        n_used=bf_df["n_used"].values,
+    )
 
 
 def compute_bulkflows_for_origins(
@@ -30,17 +100,25 @@ def compute_bulkflows_for_origins(
     cf4_df: Optional[pd.DataFrame] = None,
 ) -> dict:
     """
-    Compute bulk flows for each selected origin point.
+    Compute bulk flows for each selected origin point and write a single netCDF file.
 
-    Parameters:
-        halos_df: Full halo catalog
-        selected_points: DataFrame of selected origins
-        tree: cKDTree for spatial queries
-        cfg: Configuration dictionary
-        cf4_df: CF4 catalog DataFrame when CF4/uniform masks are requested
+    Parameters
+    ----------
+    halos_df : DataFrame
+        Full halo catalog.
+    selected_points : DataFrame
+        Selected origin points (must include 'x', 'y', 'z', 'rockstarid', 'mvir').
+    tree : cKDTree
+        Spatial index for the full halo catalog.
+    cfg : AppConfig
+        Pipeline configuration.
+    cf4_df : DataFrame, optional
+        CF4 catalog (required when masks include 'cf4' or 'uniform').
 
-    Returns:
-        timings: Dictionary with timing information
+    Returns
+    -------
+    timings : dict
+        Wall-clock times for monitoring.
     """
     output_file = cfg.paths.output_file
     r_min = cfg.bulkflow.min_radius
@@ -56,8 +134,14 @@ def compute_bulkflows_for_origins(
     uniform_radius = cfg.bulkflow.uniform_radius
     box_size = cfg.MDPL2.box_size
 
+    # Column names for per-origin environment (mirroring environment_analysis.py:34-36)
+    delta_col = f"delta_{int(cfg.origin_configs.local_overdensity_radius)}"
+    bulkflow_col = f"bulkflow_{int(cfg.origin_configs.local_bulkflow_radius)}"
+
     if mask_mode in ("cf4", "uniform", "all") and cf4_df is None:
-        raise ValueError("CF4 DataFrame is required when bulkflow.masks is 'cf4', 'uniform', or 'all'.")
+        raise ValueError(
+            "CF4 DataFrame is required when bulkflow.masks is 'cf4', 'uniform', or 'all'."
+        )
 
     use_cf4 = mask_mode in ("cf4", "all")
     use_uniform = mask_mode in ("uniform", "all")
@@ -70,6 +154,7 @@ def compute_bulkflows_for_origins(
         cf4_df=cf4_df,
     )
 
+    dataset = BulkFlowDataset()
     per_origin_times = []
     n_origins = len(selected_points)
 
@@ -110,12 +195,10 @@ def compute_bulkflows_for_origins(
                 sigma_star=sigma_star,
                 sigma_min=sigma_min,
             )
-            append_bulkflow_results(
-                bf_cf4,
-                origin_id=origin_id,
-                mask_name="cf4",
-                filename=output_file,
-            )
+            dataset.add(_build_result(
+                bf_cf4, origin, origin_id, "cf4",
+                calculation_method, row, delta_col, bulkflow_col,
+            ))
 
         if use_uniform:
             uniform_mask_df = mask_maker.make_uniform_mask(
@@ -134,12 +217,10 @@ def compute_bulkflows_for_origins(
                 sigma_star=sigma_star,
                 sigma_min=sigma_min,
             )
-            append_bulkflow_results(
-                bf_uniform,
-                origin_id=origin_id,
-                mask_name="uniform",
-                filename=output_file,
-            )
+            dataset.add(_build_result(
+                bf_uniform, origin, origin_id, "uniform",
+                calculation_method, row, delta_col, bulkflow_col,
+            ))
 
         if use_full:
             idx_full = tree.query_ball_point(origin.to_array(), r=r_max)
@@ -156,14 +237,16 @@ def compute_bulkflows_for_origins(
                 sigma_star=sigma_star,
                 sigma_min=sigma_min,
             )
-            append_bulkflow_results(
-                bf_full,
-                origin_id=origin_id,
-                mask_name="full",
-                filename=output_file,
-            )
+            dataset.add(_build_result(
+                bf_full, origin, origin_id, "full",
+                calculation_method, row, delta_col, bulkflow_col,
+            ))
 
         per_origin_times.append(time.time() - t_origin)
+
+    dataset.set_attrs(_build_dataset_attrs(cfg))
+    dataset.write(output_file)
+    logging.info(f"Results written to {output_file}")
 
     timings = {
         "process_all_origins": time.time() - t0_bulk,
@@ -173,6 +256,5 @@ def compute_bulkflows_for_origins(
     }
 
     logging.info("All origins processed successfully!")
-    logging.info(f"Results saved to {output_file}")
 
     return timings

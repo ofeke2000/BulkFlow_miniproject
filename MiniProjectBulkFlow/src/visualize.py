@@ -104,8 +104,8 @@ def visualize ():
 
 
 def plot_bulkflow_from_hdf5(
-    hdf_file: str,
-    output_folder: str,
+    hdf_file: str = None,
+    output_folder: str = "",
     key: str = "bulkflow",
     output_file: str = "bulkflow_vs_radius.png",
     plot_theory: bool = True,
@@ -117,6 +117,7 @@ def plot_bulkflow_from_hdf5(
     cosmology_cfg: CosmologyConfig = None,
     theory_cfg: TheoryConfig = None,
     style: PlotStyleConfig = None,
+    df: pd.DataFrame = None,
 ) -> None:
     """
     Plot bulk flow results from an HDF5 file.
@@ -140,7 +141,8 @@ def plot_bulkflow_from_hdf5(
     # --------------------------------------------------
     # Load data
     # --------------------------------------------------
-    df = pd.read_hdf(hdf_file, key=key)
+    if df is None:
+        df = pd.read_hdf(hdf_file, key=key)
 
     cf4_df = df[df["mask"] == "cf4"]
     uniform_df = df[df["mask"] == "uniform"]
@@ -465,8 +467,53 @@ def plot_simulation_slice_heatmap(
 
 
 #=======================================================
+# netCDF-backed bulk flow plot
+#=======================================================
+def plot_bulkflow_from_nc(
+    nc_file: str,
+    output_folder: str,
+    method: str = "chi2",
+    output_file: str = "bulkflow_vs_radius.png",
+    plot_theory: bool = True,
+    use_mean_amplitude: bool = True,
+    plot_variance_band: bool = False,
+    variance_alpha: float = None,
+    plot_all_curves: bool = False,
+    show_markers: bool = True,
+    cosmology_cfg: CosmologyConfig = None,
+    theory_cfg: TheoryConfig = None,
+    style: PlotStyleConfig = None,
+) -> None:
+    """
+    Plot bulk flow results from a netCDF file written by BulkFlowDataset.write().
+
+    Thin wrapper: opens the file, converts to a tidy DataFrame, then delegates
+    to plot_bulkflow_from_hdf5.
+    """
+    from .data.bulkflow_dataset import BulkFlowDataset
+
+    bfd = BulkFlowDataset.open(nc_file)
+    df = bfd.to_tidy_dataframe(method=method)
+
+    plot_bulkflow_from_hdf5(
+        df=df,
+        output_folder=output_folder,
+        output_file=output_file,
+        plot_theory=plot_theory,
+        use_mean_amplitude=use_mean_amplitude,
+        plot_variance_band=plot_variance_band,
+        variance_alpha=variance_alpha,
+        plot_all_curves=plot_all_curves,
+        show_markers=show_markers,
+        cosmology_cfg=cosmology_cfg,
+        theory_cfg=theory_cfg,
+        style=style,
+    )
+
+
+#=======================================================
 # plot
-#======================================================
+#=======================================================
 def plot_bulkflow_from_csv(
     csv_file: str,
     output_folder: str | None = None,

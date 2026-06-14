@@ -1,66 +1,103 @@
 """
 postprocessing.py
 -----------------
-Aggregate bulk flow results and create final visualizations.
+Aggregate bulk flow results from the netCDF output and create final plots.
+
+One-liner banded-plot recipe (matplotlib-ready):
+    ds = xr.open_dataset(nc_path)
+    bin_edges = np.arange(pp.band_min, pp.band_max + pp.band_step, pp.band_step)
+    bands = ds["U_tot"].groupby_bins(ds[ds.attrs["selection_variable"]], bins=bin_edges)
+    mean_per_band = bands.mean("origin")  # shape: (band, radius, mask, method)
 """
 
 import os
 import numpy as np
+import pandas as pd
 import logging
 
-from src.specific_utils import save_average_bulkflow_to_csv
-from src.visualize import plot_bulkflow_from_csv
+from src.data.bulkflow_dataset import BulkFlowDataset
+from src.theoretical_bulkflow import theoretical_bulkflow_colossus
+from src.visualize import plot_bulkflow_from_csv, plot_bulkflow_from_nc
 from src.classes import AppConfig
 
 
-def aggregate_results(cfg: AppConfig):
+def aggregate_results(cfg: AppConfig) -> None:
     """
-    Aggregate bulk flow results from multiple HDF5 files into a unified CSV.
+    Read the netCDF bulk flow output, band origins by the run's selection_variable,
+    compute per-band mean and std of U_tot, and write a unified CSV for plotting.
 
-    Parameters:
-        cfg: AppConfig instance
+    The mask used for the comparison curve is 'full' when masks='all', otherwise
+    whatever mask was configured. The method is taken from the dataset's own attrs
+    so the CSV reflects what was actually computed.
     """
-    base_dir = cfg.paths.output_folder
-    csv_file = os.path.join(base_dir, "unified_results.csv")
+    nc_file = cfg.paths.output_file
+    if not os.path.exists(nc_file):
+        logging.error(f"netCDF file not found: {nc_file}")
+        return
+
+    bfd = BulkFlowDataset.open(nc_file)
+    ds = bfd.dataset
+
+    sel_var = ds.attrs["selection_variable"]
     pp = cfg.postprocessing
 
-    band_edges = np.arange(pp.band_min, pp.band_max, pp.band_step)
+    # Determine which mask / method to aggregate for the comparison CSV
+    masks_in_ds = list(ds.coords["mask"].values)
+    methods_in_ds = list(ds.coords["method"].values)
 
-    for low, high in zip(band_edges[:-1], band_edges[1:]):
-        def clean_float(x: float) -> float:
-            return 0.0 if np.isclose(x, 0.0) else x
+    mask_mode = cfg.bulkflow.masks or "full"
+    plot_mask = "full" if (mask_mode == "all" or "full" in masks_in_ds) else masks_in_ds[0]
+    if plot_mask not in masks_in_ds:
+        plot_mask = masks_in_ds[0]
 
-        band_lo = clean_float(low)
-        band_hi = clean_float(high)
+    plot_method = ds.attrs.get("calculation_method", cfg.bulkflow.calculation_method)
+    if plot_method not in methods_in_ds:
+        plot_method = methods_in_ds[0]
 
-        band_dir = f"{band_lo:.0f}-{band_hi:.0f}"
-        band_str = f"{band_lo:.0f}_to_{band_hi:.0f}"
+    # (origin, radius) DataArray of U_tot for the chosen mask/method
+    U_tot_sel = ds["U_tot"].sel(mask=plot_mask, method=plot_method)
+    sel_coord = ds[sel_var]
 
-        hdf_file = os.path.join(base_dir, band_dir, f"bulkflow_cut_{band_str}.h5")
-        column_name = f"V_band_{band_lo:.0f}_to_{band_hi:.0f}"
+    radii = ds["radius"].values
+    bin_edges = np.arange(pp.band_min, pp.band_max + pp.band_step, pp.band_step)
 
-        if os.path.exists(hdf_file):
-            logging.info(f"Processing band {band_lo:.0f} → {band_hi:.0f} km/s")
-            save_average_bulkflow_to_csv(
-                hdf_file=hdf_file,
-                csv_file=csv_file,
-                column_name=column_name,
-                mask_type="full",
-                key="bulkflow",
-                cosmology_cfg=cfg.cosmology,
-                theory_cfg=cfg.theory,
-            )
-        else:
-            logging.warning(f"HDF5 file not found: {hdf_file}")
+    # Group by selection_variable bins and compute mean + std
+    bin_dim = f"{sel_var}_bins"
+    grouped_mean = U_tot_sel.groupby_bins(sel_coord, bins=bin_edges).mean("origin")
+    grouped_std = U_tot_sel.groupby_bins(sel_coord, bins=bin_edges).std("origin")
+
+    # Build unified CSV in the format expected by plot_bulkflow_from_csv
+    csv_data: dict = {"radius": radii}
+
+    intervals = grouped_mean.coords[bin_dim].values
+    for i_bin, interval in enumerate(intervals):
+        lo = interval.left
+        hi = interval.right
+        col_base = f"V_band_{lo:.0f}_to_{hi:.0f}"
+        csv_data[f"{col_base}_mean"] = grouped_mean.isel(**{bin_dim: i_bin}).values
+        csv_data[f"{col_base}_std"] = grouped_std.isel(**{bin_dim: i_bin}).values
+
+    # Theory curve
+    sigma_v = theoretical_bulkflow_colossus(
+        radii=radii,
+        cosmology_cfg=cfg.cosmology,
+        theory_cfg=cfg.theory,
+    )
+    csv_data["U_mean_theory"] = cfg.cosmology.bulk_flow_amplitude_factor * sigma_v
+
+    csv_file = os.path.join(cfg.paths.output_folder, "unified_results.csv")
+    pd.DataFrame(csv_data).to_csv(csv_file, index=False)
+    logging.info(f"Aggregated results written to {csv_file}")
 
 
-def create_final_plots(cfg: AppConfig):
+def create_final_plots(cfg: AppConfig) -> None:
     """
-    Create final comparison plots from aggregated results.
+    Create final comparison plots from the aggregated CSV.
 
-    Parameters:
-        cfg: AppConfig instance
+    The plot variable label comes from the dataset's selection_variable attribute
+    so that axis titles automatically reflect the running variable.
     """
+    nc_file = cfg.paths.output_file
     base_dir = cfg.paths.output_folder
     csv_file = os.path.join(base_dir, "unified_results.csv")
     pp = cfg.postprocessing
@@ -69,10 +106,19 @@ def create_final_plots(cfg: AppConfig):
         logging.error(f"Unified CSV file not found: {csv_file}")
         return
 
+    # Read selection_variable from the netCDF attrs so the plot label is correct
+    variable_name = pp.selection_variable
+    if os.path.exists(nc_file):
+        try:
+            bfd = BulkFlowDataset.open(nc_file)
+            variable_name = bfd.dataset.attrs.get("selection_variable", variable_name)
+        except Exception:
+            pass
+
     plot_bulkflow_from_csv(
         csv_file=csv_file,
         output_folder=base_dir,
-        variable_name="local_bulkflow",
+        variable_name=variable_name,
         var_min=pp.var_min,
         var_max=pp.var_max,
         var_step=pp.var_step,

@@ -14,3 +14,4 @@ class PostprocessingConfig:
     var_max: int = 1500
     var_step: int = 100
     error_alpha: float = 0.25
+    selection_variable: str = "overdensity"
