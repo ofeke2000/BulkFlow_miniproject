@@ -5,22 +5,21 @@ observationally motivated selection effects (CF4-like masks), and comparing to �
 
 Read these for context before non-trivial work:
 
-- [MiniProjectBulkFlow/summery.md](MiniProjectBulkFlow/summery.md) — full science context, assumptions, pipeline description (the best overview)
-- [ARCHITECTURE.md](ARCHITECTURE.md) — per-file responsibilities
-- [MiniProjectBulkFlow/Reaserch_Notes.md](MiniProjectBulkFlow/Reaserch_Notes.md) — **current research goals**; what the user is working on right now
+- [docs/summary.md](docs/summary.md) — full science context, assumptions, pipeline description (the best overview)
+- [docs/architecture.md](docs/architecture.md) — per-file responsibilities
+- [docs/research_notes.md](docs/research_notes.md) — **current research goals**; what the user is working on right now
 
 ## Running the code
 
 ```bash
 source venv/bin/activate
-cd MiniProjectBulkFlow        # required: config.yaml is loaded by relative path
-python main.py
+python main.py        # run from the repo root; config.yaml is loaded by relative path
 ```
 
 - **Ask before running the full pipeline.** It is long-running, and step 3
   (`save_catalog_checkpoint`) **overwrites the Rockstar catalog CSV in `data/`** with added
   derived columns. Small isolated snippets / imports are fine to run freely.
-- All tunable parameters live in `MiniProjectBulkFlow/config.yaml`, loaded into the dataclasses
+- All tunable parameters live in `config.yaml` (at the repo root), loaded into the dataclasses
   in `src/config/`.
 - `minimain.py` is a personal scratch script for ad-hoc analyses — not a stable entry point;
   don't treat its contents as load-bearing. **Do not read or modify `minimain.py` unless the
@@ -28,13 +27,18 @@ python main.py
 
 ## Code layout
 
-- `MiniProjectBulkFlow/main.py` — orchestrates the pipeline: preprocessing → environmental
+- `main.py` — orchestrates the pipeline: preprocessing → environmental
   analysis → origin selection → bulk flow computation → postprocessing/plots
-- `MiniProjectBulkFlow/scripts/` — one module per pipeline stage
-- `MiniProjectBulkFlow/src/` — library code (physics, masks, plotting, data loading)
-- `MiniProjectBulkFlow/src/config/` — config dataclasses mirroring config.yaml
+- `scripts/` — one module per pipeline stage
+- `src/` — library code, grouped into sub-packages:
+  - `src/physics/` — bulk-flow estimators, theoretical predictions, overdensity, near-Virgo, masks, PBC primitives
+  - `src/io/` — catalog loaders and general utilities
+  - `src/viz/` — plotting
+  - `src/config/` — config dataclasses mirroring config.yaml
+  - `src/data/` — result data structures (`Vector3D`, `BulkFlowDataset`/`BulkFlowResult`)
 - `data/` — input catalogs (Rockstar halos, CF4); large CSVs, don't load fully unless needed
 - `output/` — results (HDF5 per run) and plots
+- `docs/` — science summary, architecture, data-structure notes, research notes, test plan
 
 ## Coding conventions
 
@@ -51,7 +55,7 @@ python main.py
    checked for existence before recomputation. Any new derived quantity must follow this
    pattern: check column exists → skip if present → compute → save.
 3. **Keep docs in sync.** When a change affects structure or behavior described in
-   ARCHITECTURE.md or summery.md, update those docs in the same task.
+   `docs/architecture.md` or `docs/summary.md`, update those docs in the same task.
 
 ## Units & conventions
 

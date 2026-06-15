@@ -16,8 +16,8 @@ import pandas as pd
 import logging
 
 from src.data.bulkflow_dataset import BulkFlowDataset
-from src.theoretical_bulkflow import theoretical_bulkflow_colossus
-from src.visualize import BulkFlowPlotter
+from src.physics.theoretical_bulkflow import theoretical_bulkflow_colossus
+from src.viz.visualize import BulkFlowPlotter
 from src.classes import AppConfig
 
 
@@ -55,7 +55,7 @@ def aggregate_results(cfg: AppConfig) -> None:
         plot_method = methods_in_ds[0]
 
     # (origin, radius) DataArray of U_tot for the chosen mask/method
-    U_tot_sel = ds["U_tot"].sel(mask=plot_mask, method=plot_method)
+    U_tot_sel = ds["U_tot"].sel({"mask": plot_mask, "method": plot_method})
     sel_coord = ds[sel_var]
 
     radii = ds["radius"].values

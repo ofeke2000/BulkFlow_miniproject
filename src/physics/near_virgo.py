@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.spatial import cKDTree
 import logging
 
-from .config.virgo_config import VirgoTestConfig
+from ..config.virgo_config import VirgoTestConfig
 
 
 def near_virgo(

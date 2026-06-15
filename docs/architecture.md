@@ -71,12 +71,21 @@ for plotting. Generates final comparison plots.
 
 ### src/
 
-Directory containing reusable utility functions and core computational modules.
+Library code, grouped into themed sub-packages. The module headings below are prefixed
+with their sub-package:
+
+- `src/physics/` — bulk-flow estimators, theoretical predictions, overdensity, near-Virgo
+  test, catalog masks, and PBC primitives
+- `src/io/` — catalog loaders and general utilities
+- `src/viz/` — plotting
+- `src/config/` — config dataclasses mirroring config.yaml (see above)
+- `src/data/` — result data structures (`Vector3D`, `BulkFlowDataset`/`BulkFlowResult`)
+- `src/classes.py` — top-level convenience namespace re-exporting the public types
 
 #### __init__.py
 Package initializer to make src/ importable as a module.
 
-#### bulkflow.py
+#### physics/bulkflow.py
 Functions for calculating bulk flow velocities from halo catalogs, including series computation over radial ranges.
 
 Two estimators:
@@ -95,7 +104,6 @@ single convenience namespace.
 |---|---|
 | `vector3d.py` | Immutable 3-D vector with PBC helpers |
 | `bulkflow_dataset.py` | `BulkFlowResult` dataclass (one origin/mask/method series) and `BulkFlowDataset` (4-D xarray accumulator, netCDF writer/reader) |
-| `bulkflow_result.py` | Legacy file — superseded by `bulkflow_dataset.py` |
 
 `BulkFlowDataset` dimensions: **origin × radius × mask × method**.
 Dataset variables: `u_x`, `u_y`, `u_z`, `U_tot` (biased bulk-flow magnitude),
@@ -105,34 +113,33 @@ Per-origin coordinates (extensible without schema migration): `origin_x/y/z`,
 `overdensity`, `local_bulkflow`, `mvir`, `near_virgo`.
 Dataset attrs carry full provenance: `selection_variable`, all run parameters, `git_commit`, `timestamp`.
 
-#### data_loader.py
+#### io/data_loader.py
 Functions for loading and preprocessing data from Rockstar and CF4 catalog files.
 
-#### masks.py
+#### physics/masks.py
 Functions for creating masked halo catalogs:
 - CF4-based masks using cluster finder data
 - Uniform density masks
 
-#### near_virgo.py
+#### physics/near_virgo.py
 Implements the near-Virgo cluster environmental test.
 
-#### overdensity.py
+#### physics/overdensity.py
 Calculates local overdensity around halos using spatial queries.
 
-#### specific_utils.py
+#### physics/specific_utils.py
 Specialized utility functions for calculations, including periodic distance calculations.
 
-#### theoretical_bulkflow.py
+#### physics/theoretical_bulkflow.py
 Theoretical models and predictions for bulk flow behavior.
 
-#### utils.py
+#### io/utils.py
 General utility functions:
-- Logger setup
 - Timing functions
 - Directory creation
 - Dataframe saving
 
-#### visualize.py
+#### viz/visualize.py
 Visualization utilities. Bulk-flow plotting is consolidated in two classes:
 
 - `FacetSet` — classifies each facet (mask / method / estimator / sigma\_star / N / selection\_variable) as CONSTANT or VARYING across the curves in a figure. Constant facets go to the output filename and a corner annotation box; varying categorical facets go to legend labels; a varying selection-variable band goes to a colorbar.

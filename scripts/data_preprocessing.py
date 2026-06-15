@@ -13,8 +13,8 @@ import logging
 from pathlib import Path
 from scipy.spatial import cKDTree
 
-from src.data_loader import load_rockstar_catalog, load_cf4_catalogue
-from src.visualize import plot_simulation_slice_heatmap
+from src.io.data_loader import load_rockstar_catalog, load_cf4_catalogue
+from src.viz.visualize import plot_simulation_slice_heatmap
 from src.classes import AppConfig
 
 

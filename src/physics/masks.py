@@ -13,7 +13,7 @@ The goal is to reproduce the observational selection function in the simulation.
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
-from .config.bulkflow_config import BulkFlowConfig
+from ..config.bulkflow_config import BulkFlowConfig
 
 
 class MaskMaker:

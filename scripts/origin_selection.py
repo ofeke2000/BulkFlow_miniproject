@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import logging
 
-from src.visualize import plot_histogram
+from src.viz.visualize import plot_histogram
 from src.classes import AppConfig
 
 

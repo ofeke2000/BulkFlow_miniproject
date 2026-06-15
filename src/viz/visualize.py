@@ -18,102 +18,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import yaml
-
-from .data_loader import load_cf4_catalogue, load_rockstar_catalog
-from .specific_utils import add_periodic_distance
-from .theoretical_bulkflow import theoretical_bulkflow_colossus
-from .config import AppConfig
-from .config.cosmology_config import CosmologyConfig
-from .config.theory_config import TheoryConfig
-from .config.mdpl2_config import MDPL2Config
-from .config.visualization_config import (
+from ..io.data_loader import load_cf4_catalogue, load_rockstar_catalog
+from ..physics.specific_utils import add_periodic_distance
+from ..physics.theoretical_bulkflow import theoretical_bulkflow_colossus
+from ..config.cosmology_config import CosmologyConfig
+from ..config.theory_config import TheoryConfig
+from ..config.mdpl2_config import MDPL2Config
+from ..config.visualization_config import (
     PlotStyleConfig,
     SimulationSliceHeatmapConfig,
     VisualizationConfig,
 )
-
-
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-
-# ------------------------------------------------------
-# Load YAML configuration
-# ------------------------------------------------------
-def load_config(path: str = "config.yaml") -> dict:
-    logging.info(f"Loading config from {path}")
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
-
-
-def visualize() -> None:
-
-    plot_bulkflow = False
-
-    plot_histogram_bool = True
-    import_MDPL2 = True
-
-    # ===========================================
-    # 1. Load configuration
-    # ===========================================
-    cfg = AppConfig.from_dict(load_config("config.yaml"))
-
-    output_folder = cfg.paths.output_folder
-    output_file = cfg.paths.output_file
-
-    n_origins = cfg.origin_configs.number_of_origins
-    radius_overdensity = int(cfg.origin_configs.local_overdensity_radius)
-    radius_bulkflow = int(cfg.origin_configs.local_bulkflow_radius)
-
-    # ===========================================
-    # 2. Plot whatever is requested
-    # ===========================================
-
-    if plot_bulkflow:
-        BulkFlowPlotter(
-            nc_file=output_file,
-            output_folder=output_folder,
-            output_file=f"bulkflow_vs_radius_{n_origins}_points_With_Var.png",
-            plot_theory=True,
-            use_mean_amplitude=True,
-            plot_variance_band=True,
-            show_markers=False,
-            plot_all_curves=False,
-            cosmology_cfg=cfg.cosmology,
-            theory_cfg=cfg.theory,
-            style=cfg.visualization.style,
-        ).plot()
-
-    if plot_histogram_bool:
-
-        if import_MDPL2:
-
-            path = cfg.paths.rockstar_catalog
-            rockstar_df = load_rockstar_catalog(path=path)
-
-            key = "mvir"
-
-            delta_column = f"delta_{int(radius_overdensity)}"
-            virgo_column = "near_virgo"
-            bulkflow_column = f"bulkflow_{int(radius_bulkflow)}"
-
-            rockstar_df["mvir"] = np.log10(rockstar_df["mvir"])
-            data_df = rockstar_df
-
-        logging.info(f"Plotting histogram for column: {key}")
-        logging.info(f"Number of entries: {len(data_df)} out of {len(rockstar_df)}")
-
-        plot_histogram(
-            data_df=data_df,
-            output_folder=output_folder,
-            output_file="Mass Histogram.png",
-            key=key,
-            origin=cfg.visualization.plot_histogram_origin,
-            bins=cfg.visualization.style.mass_histogram_bins,
-            box_size=cfg.MDPL2.box_size,
-            log_axis="y",
-            style=cfg.visualization.style,
-        )
 
 
 # ===========================================================================
@@ -245,7 +160,7 @@ class BulkFlowPlotter:
 
     def plot(self) -> str:
         """Build and save the bulk-flow plot. Returns the saved file path."""
-        from .data.bulkflow_dataset import BulkFlowDataset
+        from ..data.bulkflow_dataset import BulkFlowDataset
 
         if not os.path.exists(self._nc_file):
             logging.error(f"netCDF file not found: {self._nc_file}")
@@ -343,7 +258,7 @@ class BulkFlowPlotter:
         specs: list[dict] = []
         for method in methods:
             for mask in masks:
-                sub = ds.sel(mask=mask, method=method)
+                sub = ds.sel({"mask": mask, "method": method})
                 mean_tot = sub["U_tot"].mean("origin").values
                 std_tot = sub["U_tot"].std("origin").values
                 specs.append({
@@ -366,7 +281,7 @@ class BulkFlowPlotter:
         specs: list[dict] = []
         for method in methods:
             for mask in masks:
-                sub = ds.sel(mask=mask, method=method)
+                sub = ds.sel({"mask": mask, "method": method})
                 for oid in ds.coords["origin"].values:
                     s = sub.sel(origin=oid)
                     specs.append({
@@ -403,7 +318,7 @@ class BulkFlowPlotter:
             for method in methods:
                 for mask in masks:
                     specs.append({
-                        "data": (radii, sub.sel(mask=mask, method=method).values),
+                        "data": (radii, sub.sel({"mask": mask, "method": method}).values),
                         "std": None,
                         "facets": {
                             **global_facets,

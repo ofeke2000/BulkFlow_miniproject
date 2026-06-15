@@ -37,7 +37,7 @@ import pandas as pd
 import logging
 from scipy.spatial import cKDTree
 from scipy.linalg import lu_factor, lu_solve
-from .config.bulkflow_config import BulkFlowConfig
+from ..config.bulkflow_config import BulkFlowConfig
 from .specific_utils import radial_velocity_and_error_pbc
 
 _EYE3 = np.eye(3)  # pre-allocated identity for covariance computation
@@ -319,7 +319,6 @@ def calculate_bulk_flow_series(
     # (2) radius list: r_min → r_max in steps of r_jumps
     # ---------------------------------------------------------
     r_list = np.arange(r_min, r_max + r_jumps, r_jumps)
-    r_list = np.round(r_list).astype(int)
 
     # ---------------------------------------------------------
     # (3) extract arrays

@@ -1,35 +1,8 @@
 # utils.py
 import os
 import pandas as pd
-import logging
 import time
 from functools import wraps
-
-
-# ================================================================
-# Logging utilities
-# ================================================================
-
-def setup_logger(log_file: str = None):
-    """Initialize and return a logger for the project."""
-    logger = logging.getLogger("bulkflow")
-    logger.setLevel(logging.INFO)
-
-    # Avoid duplicate handlers
-    if not logger.handlers:
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-
-        if log_file:
-            fh = logging.FileHandler(log_file)
-            fh.setLevel(logging.INFO)
-            fh.setFormatter(formatter)
-            logger.addHandler(fh)
-
-    return logger
 
 
 # ================================================================

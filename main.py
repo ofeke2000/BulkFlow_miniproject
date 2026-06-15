@@ -13,7 +13,7 @@ from scripts.environment_analysis import compute_environmental_tests
 from scripts.origin_selection import select_origin_points
 from scripts.bulkflow_computation import compute_bulkflows_for_origins
 from scripts.postprocessing import aggregate_results, create_final_plots
-from src.visualize import BulkFlowPlotter
+from src.viz.visualize import BulkFlowPlotter
 
 
 def main():

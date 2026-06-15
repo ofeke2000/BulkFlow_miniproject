@@ -15,9 +15,9 @@ import pandas as pd
 import logging
 from scipy.spatial import cKDTree
 
-from src.bulkflow import calculate_bulk_flow_series
+from src.physics.bulkflow import calculate_bulk_flow_series
 from src.classes import AppConfig, Vector3D
-from src.masks import MaskMaker
+from src.physics.masks import MaskMaker
 from src.data.bulkflow_dataset import BulkFlowDataset, BulkFlowResult
 
 LOG_PERCENT_CADENCE = 5

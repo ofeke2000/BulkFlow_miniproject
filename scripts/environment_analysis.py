@@ -8,9 +8,9 @@ import logging
 import pandas as pd
 from scipy.spatial import cKDTree
 
-from src.overdensity import OverdensityCalculator
-from src.near_virgo import near_virgo
-from src.bulkflow import calculate_local_bulkflow
+from src.physics.overdensity import OverdensityCalculator
+from src.physics.near_virgo import near_virgo
+from src.physics.bulkflow import calculate_local_bulkflow
 from src.classes import AppConfig
 
 

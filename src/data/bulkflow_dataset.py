@@ -301,7 +301,7 @@ class BulkFlowDataset:
 
         Returns an xr.Dataset with the `origin` dimension reduced.
         """
-        return self.dataset.sel(mask=mask, method=method).mean(dim="origin")
+        return self.dataset.sel({"mask": mask, "method": method}).mean(dim="origin")
 
     def band_by_selection_variable(
         self,
@@ -346,7 +346,7 @@ class BulkFlowDataset:
         # Resolve method dimension
         if "method" in ds.dims:
             if method is not None:
-                ds = ds.sel(method=method)
+                ds = ds.sel({"method": method})
             else:
                 ds = ds.isel(method=0)
 

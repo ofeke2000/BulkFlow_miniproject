@@ -2,8 +2,8 @@ import numpy as np
 from scipy.integrate import quad
 from colossus.cosmology import cosmology
 
-from .config.cosmology_config import CosmologyConfig
-from .config.theory_config import TheoryConfig
+from ..config.cosmology_config import CosmologyConfig
+from ..config.theory_config import TheoryConfig
 
 WINDOW_EPS = 1e-12
 

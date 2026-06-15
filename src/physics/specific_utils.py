@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 import os
 
-from .config.bulkflow_config import BulkFlowConfig
-from .config.cosmology_config import CosmologyConfig
-from .config.mdpl2_config import MDPL2Config
+from ..config.bulkflow_config import BulkFlowConfig
+from ..config.cosmology_config import CosmologyConfig
+from ..config.mdpl2_config import MDPL2Config
 
 ORIGIN_EPS = 1e-8
 
