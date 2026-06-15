@@ -4,6 +4,7 @@ import pandas as pd
 import os
 
 from .config.bulkflow_config import BulkFlowConfig
+from .config.cosmology_config import CosmologyConfig
 from .config.mdpl2_config import MDPL2Config
 
 ORIGIN_EPS = 1e-8
@@ -112,11 +113,17 @@ def radial_velocity_and_error_pbc(
 
     Includes full periodic boundary conditions.
 
+    Error model (distance-based):
+        sigma_i = max( (H0/h) * r_i * error_frac , min_sigma )
+    where r_i is the PBC distance to halo i (h^-1 Mpc) and H0/h converts
+    distance to a Hubble velocity (km/s per h^-1 Mpc). This models surveys
+    where fractional distance errors grow with distance.
+
     New columns added:
-        radius
-        rhat_x, rhat_y, rhat_z
-        v_rad
-        sigma_vrad
+        radius_from_origin  -- PBC distance from origin (h^-1 Mpc)
+        r_hat_x, r_hat_y, r_hat_z  -- line-of-sight unit vector components
+        v_rad               -- radial (line-of-sight) velocity (km/s)
+        sigma_v_rad         -- per-object measurement uncertainty (km/s)
     """
 
     required = ('x', 'y', 'z', 'vx', 'vy', 'vz')
@@ -157,8 +164,11 @@ def radial_velocity_and_error_pbc(
     # Radial velocity
     v_rad = np.sum(vel * r_hat, axis=1)
 
-    # Error model
-    sigma = np.maximum(np.abs(error_frac * v_rad), min_sigma)
+    # Distance-based error model:
+    #   sigma_i = max( (H0/h) * r_i * error_frac , min_sigma )
+    # H0/h converts h^-1 Mpc to km/s (≈ 100 km/s per h^-1 Mpc for MDPL2).
+    hubble_velocity_per_dist = CosmologyConfig().H0 / MDPL2Config().HubbleParameter
+    sigma = np.maximum(hubble_velocity_per_dist * r_norm * error_frac, min_sigma)
 
     # -----------------------------
     # Add columns to the DataFrame

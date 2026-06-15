@@ -87,6 +87,7 @@ def _build_result(
         u_y=bf_df["u_y"].values,
         u_z=bf_df["u_z"].values,
         U_tot=bf_df["U_total"].values,
+        U_deb=bf_df["U_debiased"].values,
         sigma_U=bf_df["sigma_U"].values,
         n_used=bf_df["n_used"].values,
     )

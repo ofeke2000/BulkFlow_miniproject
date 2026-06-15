@@ -128,6 +128,11 @@ def plot_bulkflow_from_hdf5(
         If True, plot all individual bulk-flow curves (no averaging).
     show_markers : bool
         If False, suppress markers (dots) on curves.
+
+    If the DataFrame contains a ``U_debiased`` column (noise-bias-corrected
+    magnitude, present for the chi2 estimator, NaN for the mean estimator),
+    a dashed curve of the same color is added for each mask so the debiased
+    result can be compared directly against the theory prediction.
     """
     if cosmology_cfg is None:
         cosmology_cfg = CosmologyConfig()
@@ -159,6 +164,8 @@ def plot_bulkflow_from_hdf5(
     # ==================================================
     if plot_all_curves:
 
+        has_debiased = "U_debiased" in df.columns
+
         for origin_id, d in cf4_df.groupby("origin_id"):
             plt.plot(
                 d["radius"],
@@ -167,6 +174,15 @@ def plot_bulkflow_from_hdf5(
                 alpha=style.curve_alpha,
                 linewidth=style.curve_linewidth,
             )
+            if has_debiased and d["U_debiased"].notna().any():
+                plt.plot(
+                    d["radius"],
+                    d["U_debiased"],
+                    "--",
+                    color="tab:blue",
+                    alpha=style.curve_alpha,
+                    linewidth=style.curve_linewidth,
+                )
 
         for origin_id, d in uniform_df.groupby("origin_id"):
             plt.plot(
@@ -176,6 +192,15 @@ def plot_bulkflow_from_hdf5(
                 alpha=style.curve_alpha,
                 linewidth=style.curve_linewidth,
             )
+            if has_debiased and d["U_debiased"].notna().any():
+                plt.plot(
+                    d["radius"],
+                    d["U_debiased"],
+                    "--",
+                    color="tab:orange",
+                    alpha=style.curve_alpha,
+                    linewidth=style.curve_linewidth,
+                )
 
         for origin_id, d in full_df.groupby("origin_id"):
             plt.plot(
@@ -185,29 +210,46 @@ def plot_bulkflow_from_hdf5(
                 alpha=style.curve_alpha,
                 linewidth=style.curve_linewidth,
             )
+            if has_debiased and d["U_debiased"].notna().any():
+                plt.plot(
+                    d["radius"],
+                    d["U_debiased"],
+                    "--",
+                    color="tab:green",
+                    alpha=style.curve_alpha,
+                    linewidth=style.curve_linewidth,
+                )
 
         cf4_label = "CF4 (all origins)"
         uniform_label = "Uniform (all origins)"
         full_label = "Full (all origins)"
 
-        # Dummy lines for legend
+        # Dummy lines for legend (solid = U_total, dashed = U_debiased)
         plt.plot([], [], color="tab:blue", label=cf4_label)
         plt.plot([], [], color="tab:orange", label=uniform_label)
         plt.plot([], [], color="tab:green", label=full_label)
+        if has_debiased:
+            plt.plot([], [], "--", color="grey", linewidth=style.curve_linewidth,
+                     label="debiased (dashed)")
 
     # ==================================================
     # OPTION 2: mean + variance bands (default behavior)
     # ==================================================
     else:
 
+        has_debiased = "U_debiased" in df.columns
+
         def aggregate_stats(d):
+            agg_dict = {
+                "U_mean": ("U_total", "mean"),
+                "U_std": ("U_total", "std"),
+                "N": ("U_total", "count"),
+            }
+            if has_debiased:
+                agg_dict["U_deb_mean"] = ("U_debiased", "mean")
             return (
                 d.groupby("radius", as_index=False)
-                 .agg(
-                     U_mean=("U_total", "mean"),
-                     U_std=("U_total", "std"),
-                     N=("U_total", "count"),
-                 )
+                 .agg(**agg_dict)
                  .sort_values("radius")
             )
 
@@ -215,26 +257,45 @@ def plot_bulkflow_from_hdf5(
         uniform_stats = aggregate_stats(uniform_df)
         full_stats = aggregate_stats(full_df)
 
-        plt.plot(
+        (cf4_line,) = plt.plot(
             cf4_stats["radius"],
             cf4_stats["U_mean"],
             marker=marker_cf4,
             label="CF4 (mean)",
         )
 
-        plt.plot(
+        (uniform_line,) = plt.plot(
             uniform_stats["radius"],
             uniform_stats["U_mean"],
             marker=marker_uniform,
             label="Uniform (mean)",
         )
 
-        plt.plot(
+        (full_line,) = plt.plot(
             full_stats["radius"],
             full_stats["U_mean"],
             marker=marker_full,
             label="Full (mean)",
         )
+
+        # Debiased curves: dashed, same color as the parent solid curve.
+        # Only drawn when U_debiased is present and has at least one finite value
+        # (it is NaN for the mean estimator, so the curve is silently skipped).
+        if has_debiased:
+            for stats, line, mask_label in (
+                (cf4_stats, cf4_line, "CF4"),
+                (uniform_stats, uniform_line, "Uniform"),
+                (full_stats, full_line, "Full"),
+            ):
+                if "U_deb_mean" in stats.columns and stats["U_deb_mean"].notna().any():
+                    plt.plot(
+                        stats["radius"],
+                        stats["U_deb_mean"],
+                        "--",
+                        color=line.get_color(),
+                        linewidth=style.curve_linewidth,
+                        label=f"{mask_label} (debiased)",
+                    )
 
         if plot_variance_band:
             plt.fill_between(

@@ -34,6 +34,7 @@ _UNITS: dict[str, str] = {
     "u_y": "km/s",
     "u_z": "km/s",
     "U_tot": "km/s",
+    "U_deb": "km/s",
     "sigma_U": "km/s",
     "n_used": "count",
     "radius": "h^-1 Mpc",
@@ -69,6 +70,7 @@ class BulkFlowResult:
     u_y: np.ndarray
     u_z: np.ndarray
     U_tot: np.ndarray
+    U_deb: np.ndarray
     sigma_U: np.ndarray
     n_used: np.ndarray
 
@@ -78,18 +80,19 @@ class BulkFlowResult:
         self.u_y = np.asarray(self.u_y, dtype=float)
         self.u_z = np.asarray(self.u_z, dtype=float)
         self.U_tot = np.asarray(self.U_tot, dtype=float)
+        self.U_deb = np.asarray(self.U_deb, dtype=float)
         self.sigma_U = np.asarray(self.sigma_U, dtype=float)
         self.n_used = np.asarray(self.n_used, dtype=float)
 
         if self.origin is None:
             raise ValueError("BulkFlowResult requires a valid origin")
         arrays = (self.radii, self.u_x, self.u_y, self.u_z,
-                  self.U_tot, self.sigma_U, self.n_used)
+                  self.U_tot, self.U_deb, self.sigma_U, self.n_used)
         shapes = {a.shape for a in arrays}
         if len(shapes) != 1:
             raise ValueError(
                 "BulkFlowResult: all arrays (radii, u_x, u_y, u_z, "
-                "U_tot, sigma_U, n_used) must have the same shape"
+                "U_tot, U_deb, sigma_U, n_used) must have the same shape"
             )
 
 
@@ -190,6 +193,7 @@ class BulkFlowDataset:
         u_y = np.full(shape, np.nan)
         u_z = np.full(shape, np.nan)
         U_tot = np.full(shape, np.nan)
+        U_deb = np.full(shape, np.nan)
         sigma_U = np.full(shape, np.nan)
         n_used = np.full(shape, np.nan)
 
@@ -214,6 +218,7 @@ class BulkFlowDataset:
             u_y[oi, :, mi, met_i] = res.u_y
             u_z[oi, :, mi, met_i] = res.u_z
             U_tot[oi, :, mi, met_i] = res.U_tot
+            U_deb[oi, :, mi, met_i] = res.U_deb
             sigma_U[oi, :, mi, met_i] = res.sigma_U
             n_used[oi, :, mi, met_i] = res.n_used
 
@@ -236,6 +241,12 @@ class BulkFlowDataset:
                 "u_y": (dims, u_y, {"units": _UNITS["u_y"]}),
                 "u_z": (dims, u_z, {"units": _UNITS["u_z"]}),
                 "U_tot": (dims, U_tot, {"units": _UNITS["U_tot"]}),
+                "U_deb": (dims, U_deb, {"units": _UNITS["U_deb"],
+                          "long_name": "noise-debiased bulk-flow magnitude",
+                          "description": (
+                              "sqrt(max(U_tot^2 - Tr(A^{-1}), 0)); NaN for "
+                              "the mean estimator (no analytic covariance)"
+                          )}),
                 "sigma_U": (dims, sigma_U, {"units": _UNITS["sigma_U"]}),
                 "n_used": (dims, n_used, {"units": _UNITS["n_used"]}),
             },
@@ -324,9 +335,10 @@ class BulkFlowDataset:
         """
         Convert to a flat (tidy) DataFrame with one row per (origin, mask, radius).
 
-        Columns: [origin_id, mask, radius, u_x, u_y, u_z, U_total]
+        Columns: [origin_id, mask, radius, u_x, u_y, u_z, U_total, U_debiased]
 
-        Useful for feeding plot_bulkflow_from_hdf5-style functions.
+        U_debiased is the noise-debiased bulk-flow magnitude (NaN for the mean
+        estimator).  Useful for feeding plot_bulkflow_from_hdf5-style functions.
         If *method* is None, the first available method is used.
         """
         ds = self.dataset
@@ -350,6 +362,7 @@ class BulkFlowDataset:
             u_y_arr = ds_m["u_y"].values
             u_z_arr = ds_m["u_z"].values
             U_arr = ds_m["U_tot"].values
+            U_deb_arr = ds_m["U_deb"].values
 
             oid_rep = np.repeat(origin_ids, len(radii))
             rad_rep = np.tile(radii, len(origin_ids))
@@ -362,6 +375,7 @@ class BulkFlowDataset:
                 "u_y": u_y_arr.ravel(),
                 "u_z": u_z_arr.ravel(),
                 "U_total": U_arr.ravel(),
+                "U_debiased": U_deb_arr.ravel(),
             }))
 
         return pd.concat(frames, ignore_index=True)

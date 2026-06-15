@@ -79,6 +79,12 @@ Package initializer to make src/ importable as a module.
 #### bulkflow.py
 Functions for calculating bulk flow velocities from halo catalogs, including series computation over radial ranges.
 
+Two estimators:
+- `bulk_flow_chi2_cumulative`: ML / χ² estimator (weighted least-squares with LU decomposition). Returns columns `[radius, u_x, u_y, u_z, U_total, U_debiased, sigma_U, n_used]`. `U_debiased = sqrt(max(U_total^2 - Tr(A^{-1}), 0))` removes the noise bias from the magnitude.
+- `bulk_flow_mean_cumulative`: unweighted mean of the true 3D velocities `⟨vx, vy, vz⟩` of halos within each radius. Returns the same columns; `U_debiased` and `sigma_U` are NaN (no analytic covariance).
+
+Both estimators return identical column schemas so downstream code can treat them uniformly.
+
 #### classes.py
 Re-exports `AppConfig`, `Vector3D`, `BulkFlowResult`, and `BulkFlowDataset` as a
 single convenience namespace.
@@ -92,6 +98,9 @@ single convenience namespace.
 | `bulkflow_result.py` | Legacy file — superseded by `bulkflow_dataset.py` |
 
 `BulkFlowDataset` dimensions: **origin × radius × mask × method**.
+Dataset variables: `u_x`, `u_y`, `u_z`, `U_tot` (biased bulk-flow magnitude),
+`U_deb` (noise-debiased magnitude: `sqrt(max(U_tot^2 - Tr(A^{-1}), 0))`; NaN for
+the mean estimator), `sigma_U`, `n_used`.
 Per-origin coordinates (extensible without schema migration): `origin_x/y/z`,
 `overdensity`, `local_bulkflow`, `mvir`, `near_virgo`.
 Dataset attrs carry full provenance: `selection_variable`, all run parameters, `git_commit`, `timestamp`.

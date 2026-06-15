@@ -19,10 +19,12 @@ Notes / assumptions
 -------------------
 * The module assumes halo velocities (vx, vy, vz) are in the same units as you want the
   bulk flow result (typically km/s). Positions (x,y,z) are in comoving h^-1 Mpc.
-* "error_frac" is interpreted as a fractional uncertainty on the radial velocity:
-    sigma_i = max(error_frac * |v_rad_i|, min_sigma)
-  This is a conservative and simple choice. If you meant a fractional distance error
-  or some other observational uncertainty model, see the notes below and I can adapt.
+* "error_frac" is interpreted as a fractional distance error used to compute the
+  measurement uncertainty on the radial velocity:
+    sigma_i = max( (H0/h) * r_i * error_frac , min_sigma )
+  where r_i is the PBC distance to halo i (h^-1 Mpc) and H0/h ≈ 100 km/s per h^-1 Mpc
+  converts to a Hubble velocity. This models peculiar-velocity surveys where distance
+  errors grow with distance.
 * The ML estimator fits v_rad_i = r_hat_i . U + noise with Gaussian noise sigma_i.
   The solution is U = A^{-1} b, where
     A = sum_i ( r_hat_i r_hat_i^T / sigma_i^2 ),   b = sum_i ( v_rad_i r_hat_i / sigma_i^2 )
@@ -73,9 +75,11 @@ def bulk_flow_chi2_cumulative(
     Returns
     -------
     pandas.DataFrame
-        Columns: [radius, u_x, u_y, u_z, U_total, sigma_U, n_used]
+        Columns: [radius, u_x, u_y, u_z, U_total, U_debiased, sigma_U, n_used]
         sigma_U is the propagated uncertainty on the bulk-flow magnitude:
             sigma_U = sqrt(u^T · A^{-1} · u) / |u|
+        U_debiased removes the noise bias from the magnitude:
+            U_debiased = sqrt( max(U_total^2 - Tr(A^{-1}), 0) )
         n_used is the cumulative count of halos used at each radius.
     """
 
@@ -116,8 +120,17 @@ def bulk_flow_chi2_cumulative(
                 # Covariance of u is A^{-1}; propagate to scalar sigma_U
                 cov = lu_solve((lu, piv), _EYE3)
                 sigma_U = float(np.sqrt(u @ cov @ u)) / U
+                # Noise-bias-debiased magnitude: E[|U|^2] = |B_true|^2 + Tr(A^{-1})
+                # A valid covariance matrix must have Tr(A^{-1}) > 0; a negative
+                # trace signals a near-singular A (too few halos), so we return NaN.
+                trace_cov = float(np.trace(cov))
+                if trace_cov > 0:
+                    U_debiased = float(np.sqrt(max(U**2 - trace_cov, 0.0)))
+                else:
+                    U_debiased = np.nan
             else:
                 sigma_U = np.nan
+                U_debiased = np.nan
         except Exception:
             print("\n=== BULK FLOW SOLVER FAILURE ===")
             print(f"Radius R = {R}")
@@ -145,12 +158,13 @@ def bulk_flow_chi2_cumulative(
             u = np.array([np.nan, np.nan, np.nan])
             U = np.nan
             sigma_U = np.nan
+            U_debiased = np.nan
 
-        results.append([R, u[0], u[1], u[2], U, sigma_U, idx])
+        results.append([R, u[0], u[1], u[2], U, U_debiased, sigma_U, idx])
 
     return pd.DataFrame(
         results,
-        columns=["radius", "u_x", "u_y", "u_z", "U_total", "sigma_U", "n_used"]
+        columns=["radius", "u_x", "u_y", "u_z", "U_total", "U_debiased", "sigma_U", "n_used"]
     )
 
 ##########################################################################
@@ -163,24 +177,42 @@ def bulk_flow_mean_cumulative(
     r_list: list,
     v_rad: np.ndarray,
     sigma: np.ndarray,
+    vel: np.ndarray,
     sigma_star: float | None = None
 ) -> pd.DataFrame:
     """
     Cumulative mean bulk-flow estimator.
 
-    Computes the average 3D velocity inside each radius R:
-        u = <v_x, v_y, v_z>
-    where v = v_rad * r_hat.
+    Computes the unweighted average of the true 3D velocities inside each
+    radius R (cumulative):
+        u = mean( [vx, vy, vz] )  for halos with r <= R
 
     Parameters
     ----------
-    Same as bulk_flow_chi2_cumulative (sigma, sigma_star unused).
+    r_hat : (N,3) array
+        Unit vectors to halos (sorted ascending by radius, unused here but
+        kept for a consistent call signature).
+    r_sorted : (N,) array
+        Radii of halos (sorted ascending).
+    r_list : array-like
+        Radii at which to compute the bulk flow.
+    v_rad : (N,) array
+        Radial velocities (unused in mean estimator, kept for call-signature
+        consistency).
+    sigma : (N,) array
+        Measurement uncertainties (unused in mean estimator).
+    vel : (N,3) array
+        True 3D velocities [vx, vy, vz] of halos, sorted by radius in the
+        same order as r_sorted / r_hat / v_rad.
+    sigma_star : float, optional
+        Nonlinear dispersion term (unused in mean estimator).
 
     Returns
     -------
     pandas.DataFrame
-        Columns: [radius, u_x, u_y, u_z, U_total, sigma_U, n_used]
-        sigma_U is NaN for the mean estimator (no analytic covariance).
+        Columns: [radius, u_x, u_y, u_z, U_total, U_debiased, sigma_U, n_used]
+        sigma_U and U_debiased are NaN for the mean estimator (no analytic
+        covariance available).
         n_used is the cumulative count of halos at each radius.
     """
 
@@ -193,7 +225,7 @@ def bulk_flow_mean_cumulative(
     idx = 0
     N = len(r_sorted)
 
-    # Cumulative sums
+    # Cumulative sum of true 3D velocities
     sum_v = np.zeros(3)
     count = 0
 
@@ -201,13 +233,8 @@ def bulk_flow_mean_cumulative(
 
         # Accumulate until radius threshold
         while idx < N and r_sorted[idx] <= R:
-
-            # Reconstruct 3D velocity from radial component
-            v_vec = v_rad[idx] * r_hat[idx]
-
-            sum_v += v_vec
+            sum_v += vel[idx]
             count += 1
-
             idx += 1
 
         if count > 0:
@@ -217,11 +244,11 @@ def bulk_flow_mean_cumulative(
 
         U = np.linalg.norm(u)
 
-        results.append([R, u[0], u[1], u[2], U, np.nan, count])
+        results.append([R, u[0], u[1], u[2], U, np.nan, np.nan, count])
 
     return pd.DataFrame(
         results,
-        columns=["radius", "u_x", "u_y", "u_z", "U_total", "sigma_U", "n_used"]
+        columns=["radius", "u_x", "u_y", "u_z", "U_total", "U_debiased", "sigma_U", "n_used"]
     )
 
 
@@ -265,7 +292,7 @@ def calculate_bulk_flow_series(
     Returns
     -------
     velocities_df : DataFrame
-        Columns: [radius, u_x, u_y, u_z, U_total, sigma_U, n_used]
+        Columns: [radius, u_x, u_y, u_z, U_total, U_debiased, sigma_U, n_used]
     """
 
     if error_frac is None:
@@ -301,6 +328,7 @@ def calculate_bulk_flow_series(
     v_rad = halos_df["v_rad"].values
     sigma = halos_df["sigma_v_rad"].values
     r_sorted = halos_df["radius_from_origin"].values
+    vel = halos_df[["vx", "vy", "vz"]].values
 
     # Ensure halos are sorted by radius (required for series Ainv construction)
     sort_idx = np.argsort(r_sorted)
@@ -308,6 +336,7 @@ def calculate_bulk_flow_series(
     r_hat    = r_hat[sort_idx]
     v_rad    = v_rad[sort_idx]
     sigma    = sigma[sort_idx]
+    vel      = vel[sort_idx]
 
     # ---------------------------------------------------------
     # (4) Compute bulk flow table
@@ -328,6 +357,7 @@ def calculate_bulk_flow_series(
             r_list=r_list,
             v_rad=v_rad,
             sigma=sigma,
+            vel=vel,
             sigma_star=sigma_star
         )
 

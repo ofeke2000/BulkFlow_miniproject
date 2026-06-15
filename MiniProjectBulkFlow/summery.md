@@ -235,20 +235,33 @@ A u = b
 * Uses **LU decomposition**
 * Incremental accumulation by radius
 * Propagates scalar uncertainty: `sigma_U = sqrt(uᵀ A⁻¹ u) / |u|`
+* Debiased magnitude: `U_debiased = sqrt(max(U_total² - Tr(A⁻¹), 0))` — removes the noise bias E[|Û|²] = |B_true|² + Tr(A⁻¹)
 * Also records `n_used` (cumulative halo count at each radius)
 * Debugging on failure: determinant, eigenvalues, condition number
 
 Outputs per mask:
 
 ```python
-radius, u_x, u_y, u_z, U_total, sigma_U, n_used
+radius, u_x, u_y, u_z, U_total, U_debiased, sigma_U, n_used
 ```
+
+#### Mean Estimator (Cumulative)
+
+* Computes unweighted average of true 3D velocities: `u = ⟨vx, vy, vz⟩` for halos within each radius R
+* No weighting by measurement uncertainty
+* `sigma_U` and `U_debiased` are NaN (no analytic covariance)
+* Both estimators return identical column schemas
 
 Saved to a single **netCDF** file (via `BulkFlowDataset`) with dimensions:
 
 ```
 origin × radius × mask × method
 ```
+
+Dataset variables persisted: `u_x`, `u_y`, `u_z`, `U_tot` (biased magnitude),
+`U_deb` (noise-debiased magnitude; NaN for the mean estimator), `sigma_U`, `n_used`.
+`U_deb` is the quantity to compare against ΛCDM theory because it removes the positive
+noise bias: `E[|Û|²] = |B_true|² + Tr(A⁻¹)`.
 
 Per-origin coordinates stored alongside: `overdensity`, `local_bulkflow`, `mvir`, `near_virgo`, position.
 Dataset attrs carry full provenance (`selection_variable`, all run parameters, `git_commit`, `timestamp`).
