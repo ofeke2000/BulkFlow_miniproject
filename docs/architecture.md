@@ -69,6 +69,23 @@ Reads the netCDF output via `BulkFlowDataset.open()`, bands origins by the run's
 `selection_variable`, computes per-band mean/std of U_tot, and writes a unified CSV
 for plotting. Generates final comparison plots.
 
+#### methods_comparison.py
+Standalone estimator-comparison analysis (`MethodsComparison` class), driven by
+the root `run_methods_comparison.py` entry point. Computes **both** the `chi2`
+and `mean` estimators for the *same* set of origins (full mask) and stores them
+in one netCDF (`method` is a dataset dimension), then renders two plots:
+(1) chi2 vs mean `U_tot` against ΛCDM theory, and (2) chi2 `U_tot` vs the
+noise-debiased `U_deb`. Origins are the N lowest-|delta| halos (no other cuts).
+Run-specific parameters (radial grid, N origins, estimators) are class attributes
+on `MethodsComparison`; physics/paths/cosmology come from the config. Both the
+netCDF and the two PNGs get the run's defining constants (N, mask, methods,
+sigma_star, selection_variable) appended to their filenames via the shared
+`FacetSet.filename_suffix()` logic, so different runs (e.g. N=50 vs N=200) never
+overwrite each other and the dataset sorts alongside its figures. Unlike
+`main.py`, it does **not** run the environmental analysis and does **not**
+overwrite the catalog checkpoint — it relies on the derived columns already
+present in the catalog CSV.
+
 ### src/
 
 Library code, grouped into themed sub-packages. The module headings below are prefixed
@@ -143,7 +160,7 @@ General utility functions:
 Visualization utilities. Bulk-flow plotting is consolidated in two classes:
 
 - `FacetSet` — classifies each facet (mask / method / estimator / sigma\_star / N / selection\_variable) as CONSTANT or VARYING across the curves in a figure. Constant facets go to the output filename and a corner annotation box; varying categorical facets go to legend labels; a varying selection-variable band goes to a colorbar.
-- `BulkFlowPlotter` — reads directly from a `BulkFlowDataset` netCDF. Supports mean-over-origins mode, all-curves mode, and banded mode (`band_bins` triggers `groupby_bins` by the dataset's `selection_variable`). Assigns colors from the default prop cycle for categorical facets, or from a colormap when the selection-variable band varies. Four layout constants (`_TEXTBOX_X/Y`, `_TEXTBOX_FONTSIZE`, `_TEXTBOX_ALPHA`, `_COLORBAR_PAD`) live as class attributes.
+- `BulkFlowPlotter` — reads directly from a `BulkFlowDataset` netCDF. Supports mean-over-origins mode, all-curves mode, and banded mode (`band_bins` triggers `groupby_bins` by the dataset's `selection_variable`). Assigns colors from the default prop cycle for categorical facets, or from a colormap when the selection-variable band varies. All behavioral flags/options (`plot_theory`, `use_mean_amplitude`, `plot_variance_band`, `variance_alpha`, `plot_all_curves`, `plot_debiased`, `show_markers`, `append_facets_to_filename`) are bundled in the `BulkFlowPlotConfig` dataclass (`src/config/visualization_config.py`), passed via the `plot_cfg` argument; call sites override only the fields they need. The `plot_debiased` flag (default `True`) controls whether the chi2 `U_deb` curve is drawn alongside `U_tot`; set it `False` for a clean estimator-vs-theory comparison. The `append_facets_to_filename` flag (default `True`) appends the constant-facet summary (the same key/value pairs shown in the corner textbox — N, mask, method/estimator, sigma_star, selection_variable) to the output filename, keeping each PNG self-describing and ensuring runs with different constants never overwrite each other. Four layout constants (`_TEXTBOX_X/Y`, `_TEXTBOX_FONTSIZE`, `_TEXTBOX_ALPHA`, `_COLORBAR_PAD`) live as class attributes.
 
 Module-level helpers retained: `plot_histogram`, `plot_simulation_slice_heatmap`.
 

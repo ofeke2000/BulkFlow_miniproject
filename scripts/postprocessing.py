@@ -19,6 +19,7 @@ from src.data.bulkflow_dataset import BulkFlowDataset
 from src.physics.theoretical_bulkflow import theoretical_bulkflow_colossus
 from src.viz.visualize import BulkFlowPlotter
 from src.classes import AppConfig
+from src.config import BulkFlowPlotConfig
 
 
 def aggregate_results(cfg: AppConfig) -> None:
@@ -112,8 +113,7 @@ def create_final_plots(cfg: AppConfig) -> None:
         output_folder=base_dir,
         output_file="bulkflow_comparison.png",
         band_bins=band_bins,
-        plot_theory=True,
-        show_markers=False,
+        plot_cfg=BulkFlowPlotConfig(show_markers=False),
         cosmology_cfg=cfg.cosmology,
         theory_cfg=cfg.theory,
         style=cfg.visualization.style,

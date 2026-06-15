@@ -25,6 +25,7 @@ from ..config.cosmology_config import CosmologyConfig
 from ..config.theory_config import TheoryConfig
 from ..config.mdpl2_config import MDPL2Config
 from ..config.visualization_config import (
+    BulkFlowPlotConfig,
     PlotStyleConfig,
     SimulationSliceHeatmapConfig,
     VisualizationConfig,
@@ -130,13 +131,8 @@ class BulkFlowPlotter:
         output_folder: str,
         output_file: str | None = None,
         methods: list[str] | None = None,
-        plot_theory: bool = True,
-        use_mean_amplitude: bool = True,
-        plot_variance_band: bool = False,
-        variance_alpha: float | None = None,
-        plot_all_curves: bool = False,
-        show_markers: bool = True,
         band_bins: np.ndarray | None = None,
+        plot_cfg: BulkFlowPlotConfig | None = None,
         cosmology_cfg: CosmologyConfig | None = None,
         theory_cfg: TheoryConfig | None = None,
         style: PlotStyleConfig | None = None,
@@ -145,17 +141,20 @@ class BulkFlowPlotter:
         self._output_folder = output_folder
         self._output_file = output_file
         self._methods = methods
-        self._plot_theory = plot_theory
-        self._use_mean_amplitude = use_mean_amplitude
-        self._plot_variance_band = plot_variance_band
-        self._plot_all_curves = plot_all_curves
-        self._show_markers = show_markers
         self._band_bins = band_bins
+        cfg = plot_cfg or BulkFlowPlotConfig()
+        self._plot_theory = cfg.plot_theory
+        self._use_mean_amplitude = cfg.use_mean_amplitude
+        self._plot_variance_band = cfg.plot_variance_band
+        self._plot_all_curves = cfg.plot_all_curves
+        self._plot_debiased = cfg.plot_debiased
+        self._show_markers = cfg.show_markers
+        self._append_facets = cfg.append_facets_to_filename
         self._cosmology_cfg = cosmology_cfg or CosmologyConfig()
         self._theory_cfg = theory_cfg or TheoryConfig()
         self._style = style or PlotStyleConfig()
         self._variance_alpha = (
-            variance_alpha if variance_alpha is not None else self._style.curve_alpha
+            cfg.variance_alpha if cfg.variance_alpha is not None else self._style.curve_alpha
         )
 
     def plot(self) -> str:
@@ -205,7 +204,7 @@ class BulkFlowPlotter:
         ax.grid(True)
         fig.tight_layout()
 
-        out_file = self._output_file or self._auto_filename(facet_set)
+        out_file = self._resolve_filename(facet_set)
         os.makedirs(self._output_folder, exist_ok=True)
         out_path = os.path.join(self._output_folder, out_file)
         fig.savefig(out_path, dpi=self._style.dpi_normal)
@@ -268,7 +267,7 @@ class BulkFlowPlotter:
                     "is_individual": False,
                 })
                 deb_vals = sub["U_deb"].values
-                if np.any(np.isfinite(deb_vals)):
+                if self._plot_debiased and np.any(np.isfinite(deb_vals)):
                     specs.append({
                         "data": (radii, sub["U_deb"].mean("origin").values),
                         "std": None,
@@ -291,7 +290,7 @@ class BulkFlowPlotter:
                         "is_individual": True,
                     })
                     deb = s["U_deb"].values
-                    if np.any(np.isfinite(deb)):
+                    if self._plot_debiased and np.any(np.isfinite(deb)):
                         specs.append({
                             "data": (radii, deb),
                             "std": None,
@@ -444,6 +443,24 @@ class BulkFlowPlotter:
             verticalalignment="top",
             bbox=dict(boxstyle="round", alpha=self._TEXTBOX_ALPHA, facecolor="white"),
         )
+
+    def _resolve_filename(self, facet_set: FacetSet) -> str:
+        """
+        Resolve the output filename.
+
+        With no explicit ``output_file`` an auto name is generated. When
+        ``append_facets_to_filename`` is set, the constant-facet summary (the
+        same key/value pairs shown in the corner textbox) is appended to the
+        base name so runs with different constants never overwrite each other.
+        """
+        if self._output_file is None:
+            return self._auto_filename(facet_set)
+        if not self._append_facets:
+            return self._output_file
+        base, ext = os.path.splitext(self._output_file)
+        ext = ext or ".png"
+        suffix = facet_set.filename_suffix()
+        return f"{base}__{suffix}{ext}" if suffix else f"{base}{ext}"
 
     def _auto_filename(self, facet_set: FacetSet) -> str:
         suffix = facet_set.filename_suffix()

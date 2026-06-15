@@ -7,7 +7,12 @@ from .paths_config import PathsConfig, ROCKSTAR_COLUMNS
 from .postprocessing_config import PostprocessingConfig
 from .theory_config import TheoryConfig
 from .virgo_config import VirgoTestConfig
-from .visualization_config import PlotStyleConfig, SimulationSliceHeatmapConfig, VisualizationConfig
+from .visualization_config import (
+    BulkFlowPlotConfig,
+    PlotStyleConfig,
+    SimulationSliceHeatmapConfig,
+    VisualizationConfig,
+)
 
 __all__ = [
     "AppConfig",
@@ -20,6 +25,7 @@ __all__ = [
     "PostprocessingConfig",
     "TheoryConfig",
     "VirgoTestConfig",
+    "BulkFlowPlotConfig",
     "PlotStyleConfig",
     "SimulationSliceHeatmapConfig",
     "VisualizationConfig",

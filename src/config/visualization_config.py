@@ -34,9 +34,29 @@ class PlotStyleConfig:
 
 
 @dataclass
+class BulkFlowPlotConfig:
+    """Behavioral flags/options for BulkFlowPlotter.
+
+    Defaults describe the standard bulk-flow plot; individual call sites
+    override only the fields they need.
+    """
+    plot_theory: bool = True
+    use_mean_amplitude: bool = True
+    plot_variance_band: bool = False
+    variance_alpha: float | None = None
+    plot_all_curves: bool = False
+    plot_debiased: bool = True
+    show_markers: bool = True
+    # Append the constant-facet summary (the corner textbox contents) to the
+    # output filename, so runs with different constants never overwrite.
+    append_facets_to_filename: bool = True
+
+
+@dataclass
 class VisualizationConfig:
     """Fixed visualization parameters - not user-editable."""
     projection_plane: str = "xy"
     simulation_slice_heatmap: SimulationSliceHeatmapConfig = field(default_factory=SimulationSliceHeatmapConfig)
     style: PlotStyleConfig = field(default_factory=PlotStyleConfig)
+    bulkflow_plot: BulkFlowPlotConfig = field(default_factory=BulkFlowPlotConfig)
     plot_histogram_origin: tuple[float, float, float] = (0.0, 0.0, 0.0)

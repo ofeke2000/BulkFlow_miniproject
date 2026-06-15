@@ -3,13 +3,13 @@
 cf4_catalog_type: "cf4"
 
 # Output folder selection: "default" or "temp"
-output_folder_type: "default"
+output_folder_type: "temp"
 
 # Temporary folder name (only used if output_folder_type is "temp", will be inside output/)
-temp_folder_name: "temp_bulkflow"
+temp_folder_name: "methods comparison"
 
 # Output file name (without folder path)
-output_file_name: "bulkflow_cut_1400_to_1500.h5"
+output_file_name: "methods_comparison.nc"
 
 bulkflow:
   masks: "full"            # "full", "cf4", "uniform", or "all"
@@ -35,12 +35,12 @@ origin_configs:
   local_bulkflow_radius: 3.0     # h^-1 Mpc
   local_bulkflow_upper_cut: 1500.0  # km/s
   local_bulkflow_lower_cut: 1400.0    # km/s
-  use_virgo_criteria: true
+  use_virgo_criteria: false
   number_of_origins: 1000
   mass_cut: 1e14                # h^-1 Msun
   mass_cut_bool: false        # if true, apply mass cut to the entire catalog
-  select_lowest_delta: false  # if true, select points with lowest |delta|
-  select_random: true      # if true, select random points from candidates after cuts
+  select_lowest_delta: true  # if true, select points with lowest |delta|
+  select_random: false      # if true, select random points from candidates after cuts
 
 postprocessing:
   enabled: false

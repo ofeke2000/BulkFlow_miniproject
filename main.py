@@ -14,6 +14,7 @@ from scripts.origin_selection import select_origin_points
 from scripts.bulkflow_computation import compute_bulkflows_for_origins
 from scripts.postprocessing import aggregate_results, create_final_plots
 from src.viz.visualize import BulkFlowPlotter
+from src.config import BulkFlowPlotConfig
 
 
 def main():
@@ -81,11 +82,7 @@ def main():
         output_folder=output_folder,
         methods=[cfg.bulkflow.calculation_method],
         output_file=f"bulkflow_vs_radius_local_bulkflow_[{bulkflow_lower_cut:.0f},{bulkflow_upper_cut:.0f}].png",
-        plot_theory=True,
-        use_mean_amplitude=True,
-        plot_variance_band=True,
-        show_markers=False,
-        plot_all_curves=False,
+        plot_cfg=BulkFlowPlotConfig(plot_variance_band=True, show_markers=False),
         cosmology_cfg=cfg.cosmology,
         theory_cfg=cfg.theory,
         style=cfg.visualization.style,

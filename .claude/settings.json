@@ -27,7 +27,7 @@
       "Bash(venv/bin/pip show*)",
       "Bash(venv/bin/pip freeze*)"
     ],
-    "deny": [
+    "ask": [
       "Bash(rm *)"
     ]
   }
