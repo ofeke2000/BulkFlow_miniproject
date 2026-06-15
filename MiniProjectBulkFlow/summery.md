@@ -312,9 +312,9 @@ Options:
 
 ### Plotting
 
-* `plot_bulkflow_from_hdf5`
+* `BulkFlowPlotter` — class-based, netCDF-backed plotter with facet-aware routing
+* `FacetSet` — routing helper (constant → filename + textbox; varying categorical → legend; varying selection band → colorbar)
 * `plot_histogram`
-* `plot_distance_histogram`
 * `plot_simulation_slice_heatmap`
 
 ---

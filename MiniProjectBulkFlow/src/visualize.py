@@ -1,11 +1,23 @@
-import pandas as pd
-import numpy as np
-import re
-import matplotlib.pyplot as plt
-import matplotlib as mpl
+"""
+visualize.py
+------------
+Visualization utilities for bulk flow analysis.
+
+Bulk-flow plotting is consolidated in BulkFlowPlotter (class-based, netCDF-backed).
+FacetSet encapsulates the constant-vs-varying routing logic.
+Histogram and simulation-slice helpers remain as module-level functions.
+"""
+
+from __future__ import annotations
+
 import os
+import re
 import logging
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 import yaml
 
 from .data_loader import load_cf4_catalogue, load_rockstar_catalog
@@ -15,10 +27,15 @@ from .config import AppConfig
 from .config.cosmology_config import CosmologyConfig
 from .config.theory_config import TheoryConfig
 from .config.mdpl2_config import MDPL2Config
-from .config.visualization_config import PlotStyleConfig, SimulationSliceHeatmapConfig, VisualizationConfig
+from .config.visualization_config import (
+    PlotStyleConfig,
+    SimulationSliceHeatmapConfig,
+    VisualizationConfig,
+)
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 
 # ------------------------------------------------------
 # Load YAML configuration
@@ -28,13 +45,13 @@ def load_config(path: str = "config.yaml") -> dict:
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
-def visualize ():
 
-    plot_bulkflow=False
+def visualize() -> None:
 
-    plot_histogram_bool=True
-    import_MDPL2=True
-    import_CF4=False
+    plot_bulkflow = False
+
+    plot_histogram_bool = True
+    import_MDPL2 = True
 
     # ===========================================
     # 1. Load configuration
@@ -53,10 +70,9 @@ def visualize ():
     # ===========================================
 
     if plot_bulkflow:
-        plot_bulkflow_from_hdf5(
-            hdf_file=output_file,
+        BulkFlowPlotter(
+            nc_file=output_file,
             output_folder=output_folder,
-            key="bulkflow",
             output_file=f"bulkflow_vs_radius_{n_origins}_points_With_Var.png",
             plot_theory=True,
             use_mean_amplitude=True,
@@ -66,16 +82,14 @@ def visualize ():
             cosmology_cfg=cfg.cosmology,
             theory_cfg=cfg.theory,
             style=cfg.visualization.style,
-        )
+        ).plot()
 
     if plot_histogram_bool:
 
         if import_MDPL2:
 
-            path=cfg.paths.rockstar_catalog
-            rockstar_df = load_rockstar_catalog(
-                path=path
-            )
+            path = cfg.paths.rockstar_catalog
+            rockstar_df = load_rockstar_catalog(path=path)
 
             key = "mvir"
 
@@ -83,297 +97,460 @@ def visualize ():
             virgo_column = "near_virgo"
             bulkflow_column = f"bulkflow_{int(radius_bulkflow)}"
 
-            rockstar_df['mvir'] = np.log10(rockstar_df['mvir'])
+            rockstar_df["mvir"] = np.log10(rockstar_df["mvir"])
             data_df = rockstar_df
 
         logging.info(f"Plotting histogram for column: {key}")
         logging.info(f"Number of entries: {len(data_df)} out of {len(rockstar_df)}")
 
-
         plot_histogram(
-        data_df=data_df,
-        output_folder=output_folder,
-        output_file="Mass Histogram.png",
-        key=key,
-        origin=cfg.visualization.plot_histogram_origin,
-        bins=cfg.visualization.style.mass_histogram_bins,
-        box_size=cfg.MDPL2.box_size,
-        log_axis="y",
-        style=cfg.visualization.style,
+            data_df=data_df,
+            output_folder=output_folder,
+            output_file="Mass Histogram.png",
+            key=key,
+            origin=cfg.visualization.plot_histogram_origin,
+            bins=cfg.visualization.style.mass_histogram_bins,
+            box_size=cfg.MDPL2.box_size,
+            log_axis="y",
+            style=cfg.visualization.style,
         )
 
 
-def plot_bulkflow_from_hdf5(
-    hdf_file: str = None,
-    output_folder: str = "",
-    key: str = "bulkflow",
-    output_file: str = "bulkflow_vs_radius.png",
-    plot_theory: bool = True,
-    use_mean_amplitude: bool = True,
-    plot_variance_band: bool = False,
-    variance_alpha: float = None,
-    plot_all_curves: bool = False,
-    show_markers: bool = True,
-    cosmology_cfg: CosmologyConfig = None,
-    theory_cfg: TheoryConfig = None,
-    style: PlotStyleConfig = None,
-    df: pd.DataFrame = None,
-) -> None:
+# ===========================================================================
+# FacetSet — constant-vs-varying routing helper
+# ===========================================================================
+
+class FacetSet:
     """
-    Plot bulk flow results from an HDF5 file.
+    Analyses the facet dict of every curve in a figure and classifies each
+    facet as CONSTANT (identical across all curves) or VARYING.
 
-    Options
-    -------
-    plot_all_curves : bool
-        If True, plot all individual bulk-flow curves (no averaging).
-    show_markers : bool
-        If False, suppress markers (dots) on curves.
+    Routing rules
+    -------------
+    CONSTANT facets              → output filename + corner text box.
+    VARYING categorical facets   → legend labels (mask / method / estimator).
+    VARYING ``sel_band`` facet   → colorbar; excluded from legend.
 
-    If the DataFrame contains a ``U_debiased`` column (noise-bias-corrected
-    magnitude, present for the chi2 estimator, NaN for the mean estimator),
-    a dashed curve of the same color is added for each mask so the debiased
-    result can be compared directly against the theory prediction.
+    ``sel_band_mid`` is an internal numeric helper for colormap normalisation;
+    it is excluded from filename and text box output.
     """
-    if cosmology_cfg is None:
-        cosmology_cfg = CosmologyConfig()
-    if theory_cfg is None:
-        theory_cfg = TheoryConfig()
-    if style is None:
-        style = PlotStyleConfig()
-    if variance_alpha is None:
-        variance_alpha = style.curve_alpha
 
-    # --------------------------------------------------
-    # Load data
-    # --------------------------------------------------
-    if df is None:
-        df = pd.read_hdf(hdf_file, key=key)
+    _SANITIZE: re.Pattern = re.compile(r"[^\w\-]")
+    _DISPLAY_EXCLUDE: frozenset[str] = frozenset({"sel_band_mid"})
+    _CATEGORICAL: frozenset[str] = frozenset({"mask", "method", "estimator"})
 
-    cf4_df = df[df["mask"] == "cf4"]
-    uniform_df = df[df["mask"] == "uniform"]
-    full_df = df[df["mask"] == "full"]
+    def __init__(self, curve_facets: list[dict]) -> None:
+        if not curve_facets:
+            raise ValueError("FacetSet requires at least one curve.")
+        all_keys: set[str] = set().union(*curve_facets)
+        self._constant: dict[str, object] = {}
+        self._varying: set[str] = set()
+        for key in all_keys:
+            values = {f.get(key) for f in curve_facets}
+            if len(values) == 1:
+                self._constant[key] = next(iter(values))
+            else:
+                self._varying.add(key)
 
-    marker_cf4 = "o" if show_markers else None
-    marker_uniform = "s" if show_markers else None
-    marker_full = "D" if show_markers else None
+    @property
+    def constant_facets(self) -> dict:
+        return dict(self._constant)
 
-    plt.figure(figsize=style.bulkflow_figsize)
+    @property
+    def varying_facets(self) -> set[str]:
+        return set(self._varying)
 
-    # ==================================================
-    # OPTION 1: plot ALL curves (no averaging)
-    # ==================================================
-    if plot_all_curves:
+    def legend_label(self, curve_facet: dict) -> str:
+        """Legend label built from VARYING categorical facets only."""
+        varying_cat = self._varying & self._CATEGORICAL
+        parts = [f"{k}={curve_facet.get(k, '?')}" for k in sorted(varying_cat)]
+        return ", ".join(parts)
 
-        has_debiased = "U_debiased" in df.columns
+    def filename_suffix(self) -> str:
+        """Sanitised constant-facet key-value pairs for embedding in a filename."""
+        parts = []
+        for key, val in sorted(self._constant.items()):
+            if key in self._DISPLAY_EXCLUDE:
+                continue
+            safe = self._SANITIZE.sub("_", str(val))
+            parts.append(f"{key}-{safe}")
+        return "__".join(parts)
 
-        for origin_id, d in cf4_df.groupby("origin_id"):
-            plt.plot(
-                d["radius"],
-                d["U_total"],
-                color="tab:blue",
-                alpha=style.curve_alpha,
-                linewidth=style.curve_linewidth,
+    def textbox_text(self) -> str:
+        """Multi-line summary of all constant facets (for the corner annotation)."""
+        return "\n".join(
+            f"{k}: {v}"
+            for k, v in sorted(self._constant.items())
+            if k not in self._DISPLAY_EXCLUDE
+        )
+
+
+# ===========================================================================
+# BulkFlowPlotter
+# ===========================================================================
+
+class BulkFlowPlotter:
+    """
+    Facet-aware, class-based bulk-flow plotter that reads directly from a
+    BulkFlowDataset netCDF file.
+
+    Constant facets (same value across every plotted curve) appear in the
+    output filename and a corner annotation box so the saved PNG is
+    self-describing.  Varying categorical facets (mask / method / estimator)
+    appear in the legend.  When ``band_bins`` is supplied, origins are grouped
+    by the dataset's ``selection_variable`` and the band coordinate is rendered
+    as a colorbar instead of a legend entry.
+    """
+
+    # Layout/style constants — not in config.yaml (non-user-facing defaults)
+    _TEXTBOX_X: float = 0.02
+    _TEXTBOX_Y: float = 0.98
+    _TEXTBOX_FONTSIZE: int = 8
+    _TEXTBOX_ALPHA: float = 0.8
+    _COLORBAR_PAD: float = 0.02
+
+    def __init__(
+        self,
+        nc_file: str,
+        output_folder: str,
+        output_file: str | None = None,
+        methods: list[str] | None = None,
+        plot_theory: bool = True,
+        use_mean_amplitude: bool = True,
+        plot_variance_band: bool = False,
+        variance_alpha: float | None = None,
+        plot_all_curves: bool = False,
+        show_markers: bool = True,
+        band_bins: np.ndarray | None = None,
+        cosmology_cfg: CosmologyConfig | None = None,
+        theory_cfg: TheoryConfig | None = None,
+        style: PlotStyleConfig | None = None,
+    ) -> None:
+        self._nc_file = nc_file
+        self._output_folder = output_folder
+        self._output_file = output_file
+        self._methods = methods
+        self._plot_theory = plot_theory
+        self._use_mean_amplitude = use_mean_amplitude
+        self._plot_variance_band = plot_variance_band
+        self._plot_all_curves = plot_all_curves
+        self._show_markers = show_markers
+        self._band_bins = band_bins
+        self._cosmology_cfg = cosmology_cfg or CosmologyConfig()
+        self._theory_cfg = theory_cfg or TheoryConfig()
+        self._style = style or PlotStyleConfig()
+        self._variance_alpha = (
+            variance_alpha if variance_alpha is not None else self._style.curve_alpha
+        )
+
+    def plot(self) -> str:
+        """Build and save the bulk-flow plot. Returns the saved file path."""
+        from .data.bulkflow_dataset import BulkFlowDataset
+
+        if not os.path.exists(self._nc_file):
+            logging.error(f"netCDF file not found: {self._nc_file}")
+            return ""
+
+        bfd = BulkFlowDataset.open(self._nc_file)
+        ds = bfd.dataset
+
+        radii = ds.coords["radius"].values
+        masks = list(ds.coords["mask"].values)
+        all_methods = list(ds.coords["method"].values)
+        methods = [m for m in (self._methods or all_methods) if m in all_methods]
+        sel_var = ds.attrs.get("selection_variable")
+
+        global_facets = self._extract_global_facets(ds)
+        curve_specs = self._build_curve_specs(ds, radii, masks, methods, sel_var, global_facets)
+        facet_set = FacetSet([cs["facets"] for cs in curve_specs])
+
+        fig, ax = plt.subplots(figsize=self._style.bulkflow_figsize)
+
+        colorbar_sm = self._draw_curves(ax, curve_specs, facet_set)
+
+        if colorbar_sm is not None:
+            fig.colorbar(
+                colorbar_sm,
+                ax=ax,
+                pad=self._COLORBAR_PAD,
+                label=sel_var or "selection variable",
             )
-            if has_debiased and d["U_debiased"].notna().any():
-                plt.plot(
-                    d["radius"],
-                    d["U_debiased"],
-                    "--",
-                    color="tab:blue",
-                    alpha=style.curve_alpha,
-                    linewidth=style.curve_linewidth,
-                )
 
-        for origin_id, d in uniform_df.groupby("origin_id"):
-            plt.plot(
-                d["radius"],
-                d["U_total"],
-                color="tab:orange",
-                alpha=style.curve_alpha,
-                linewidth=style.curve_linewidth,
-            )
-            if has_debiased and d["U_debiased"].notna().any():
-                plt.plot(
-                    d["radius"],
-                    d["U_debiased"],
-                    "--",
-                    color="tab:orange",
-                    alpha=style.curve_alpha,
-                    linewidth=style.curve_linewidth,
-                )
+        if self._plot_theory:
+            self._draw_theory(ax, radii)
 
-        for origin_id, d in full_df.groupby("origin_id"):
-            plt.plot(
-                d["radius"],
-                d["U_total"],
-                color="tab:green",
-                alpha=style.curve_alpha,
-                linewidth=style.curve_linewidth,
-            )
-            if has_debiased and d["U_debiased"].notna().any():
-                plt.plot(
-                    d["radius"],
-                    d["U_debiased"],
-                    "--",
-                    color="tab:green",
-                    alpha=style.curve_alpha,
-                    linewidth=style.curve_linewidth,
-                )
+        if any(k in facet_set.varying_facets for k in FacetSet._CATEGORICAL):
+            ax.legend()
 
-        cf4_label = "CF4 (all origins)"
-        uniform_label = "Uniform (all origins)"
-        full_label = "Full (all origins)"
+        self._draw_textbox(ax, facet_set)
 
-        # Dummy lines for legend (solid = U_total, dashed = U_debiased)
-        plt.plot([], [], color="tab:blue", label=cf4_label)
-        plt.plot([], [], color="tab:orange", label=uniform_label)
-        plt.plot([], [], color="tab:green", label=full_label)
-        if has_debiased:
-            plt.plot([], [], "--", color="grey", linewidth=style.curve_linewidth,
-                     label="debiased (dashed)")
+        ax.set_xlabel(r"Radius [$h^{-1}$ Mpc]")
+        ax.set_ylabel(r"$|U|$ [km/s]")
+        ax.set_title("Bulk Flow vs Radius")
+        ax.grid(True)
+        fig.tight_layout()
 
-    # ==================================================
-    # OPTION 2: mean + variance bands (default behavior)
-    # ==================================================
-    else:
+        out_file = self._output_file or self._auto_filename(facet_set)
+        os.makedirs(self._output_folder, exist_ok=True)
+        out_path = os.path.join(self._output_folder, out_file)
+        fig.savefig(out_path, dpi=self._style.dpi_normal)
+        plt.close(fig)
 
-        has_debiased = "U_debiased" in df.columns
+        logging.info(f"Saved bulk-flow plot: {out_path}")
+        return out_path
 
-        def aggregate_stats(d):
-            agg_dict = {
-                "U_mean": ("U_total", "mean"),
-                "U_std": ("U_total", "std"),
-                "N": ("U_total", "count"),
+    # ------------------------------------------------------------------
+    # Dataset-level metadata extraction
+    # ------------------------------------------------------------------
+
+    def _extract_global_facets(self, ds) -> dict:
+        """
+        Extract dataset-wide constants from attrs and dims to embed in every
+        curve's facet dict, so they always appear in the textbox.
+        """
+        facets: dict = {}
+        sel_var = ds.attrs.get("selection_variable")
+        if sel_var:
+            facets["selection_variable"] = sel_var
+        sigma_star = ds.attrs.get("sigma_star")
+        if sigma_star is not None:
+            facets["sigma_star"] = sigma_star
+        n_origins = ds.attrs.get("number_of_origins", ds.dims.get("origin"))
+        if n_origins is not None:
+            facets["N"] = n_origins
+        return facets
+
+    # ------------------------------------------------------------------
+    # Curve-spec builders
+    # ------------------------------------------------------------------
+
+    def _build_curve_specs(
+        self,
+        ds,
+        radii: np.ndarray,
+        masks: list[str],
+        methods: list[str],
+        sel_var: str | None,
+        global_facets: dict,
+    ) -> list[dict]:
+        if self._band_bins is not None and sel_var is not None:
+            return self._build_banded_specs(ds, radii, masks, methods, sel_var, global_facets)
+        if self._plot_all_curves:
+            return self._build_individual_specs(ds, radii, masks, methods, global_facets)
+        return self._build_mean_specs(ds, radii, masks, methods, global_facets)
+
+    def _build_mean_specs(self, ds, radii, masks, methods, global_facets) -> list[dict]:
+        specs: list[dict] = []
+        for method in methods:
+            for mask in masks:
+                sub = ds.sel(mask=mask, method=method)
+                mean_tot = sub["U_tot"].mean("origin").values
+                std_tot = sub["U_tot"].std("origin").values
+                specs.append({
+                    "data": (radii, mean_tot),
+                    "std": std_tot,
+                    "facets": {**global_facets, "mask": mask, "method": method, "estimator": "total"},
+                    "is_individual": False,
+                })
+                deb_vals = sub["U_deb"].values
+                if np.any(np.isfinite(deb_vals)):
+                    specs.append({
+                        "data": (radii, sub["U_deb"].mean("origin").values),
+                        "std": None,
+                        "facets": {**global_facets, "mask": mask, "method": method, "estimator": "debiased"},
+                        "is_individual": False,
+                    })
+        return specs
+
+    def _build_individual_specs(self, ds, radii, masks, methods, global_facets) -> list[dict]:
+        specs: list[dict] = []
+        for method in methods:
+            for mask in masks:
+                sub = ds.sel(mask=mask, method=method)
+                for oid in ds.coords["origin"].values:
+                    s = sub.sel(origin=oid)
+                    specs.append({
+                        "data": (radii, s["U_tot"].values),
+                        "std": None,
+                        "facets": {**global_facets, "mask": mask, "method": method, "estimator": "total"},
+                        "is_individual": True,
+                    })
+                    deb = s["U_deb"].values
+                    if np.any(np.isfinite(deb)):
+                        specs.append({
+                            "data": (radii, deb),
+                            "std": None,
+                            "facets": {**global_facets, "mask": mask, "method": method, "estimator": "debiased"},
+                            "is_individual": True,
+                        })
+        return specs
+
+    def _build_banded_specs(
+        self, ds, radii, masks, methods, sel_var, global_facets
+    ) -> list[dict]:
+        coord = ds[sel_var]
+        bin_dim = f"{sel_var}_bins"
+        mean_per_band = (
+            ds["U_tot"]
+            .groupby_bins(coord, bins=self._band_bins)
+            .mean("origin")
+        )
+        specs: list[dict] = []
+        for i_bin, interval in enumerate(mean_per_band.coords[bin_dim].values):
+            low, high = interval.left, interval.right
+            mid = 0.5 * (low + high)
+            sub = mean_per_band.isel(**{bin_dim: i_bin})
+            for method in methods:
+                for mask in masks:
+                    specs.append({
+                        "data": (radii, sub.sel(mask=mask, method=method).values),
+                        "std": None,
+                        "facets": {
+                            **global_facets,
+                            "mask": mask,
+                            "method": method,
+                            "estimator": "total",
+                            "sel_band": f"{low:.0f}-{high:.0f}",
+                            "sel_band_mid": mid,
+                        },
+                        "is_individual": False,
+                    })
+        return specs
+
+    # ------------------------------------------------------------------
+    # Drawing helpers
+    # ------------------------------------------------------------------
+
+    def _draw_curves(
+        self, ax, curve_specs: list[dict], facet_set: FacetSet
+    ) -> mpl.cm.ScalarMappable | None:
+        """
+        Draw all curves. Returns a ScalarMappable when the sel_band facet
+        varies (caller attaches a colorbar), else None.
+        """
+        uses_colorbar = "sel_band" in facet_set.varying_facets
+
+        if uses_colorbar:
+            midpoints = [cs["facets"]["sel_band_mid"] for cs in curve_specs]
+            vmin, vmax = min(midpoints), max(midpoints)
+            if vmin < 0 < vmax:
+                norm = mpl.colors.TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
+            else:
+                norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+            cmap = plt.cm.coolwarm
+        else:
+            prop_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+            cat_keys: list[tuple] = list(dict.fromkeys(
+                (cs["facets"].get("mask"), cs["facets"].get("method"))
+                for cs in curve_specs
+            ))
+            cat_color: dict[tuple, str] = {
+                k: prop_colors[i % len(prop_colors)]
+                for i, k in enumerate(cat_keys)
             }
-            if has_debiased:
-                agg_dict["U_deb_mean"] = ("U_debiased", "mean")
-            return (
-                d.groupby("radius", as_index=False)
-                 .agg(**agg_dict)
-                 .sort_values("radius")
+
+        labels_drawn: set[str] = set()
+        marker = "o" if self._show_markers else None
+
+        for cs in curve_specs:
+            radii, values = cs["data"]
+            is_debiased = cs["facets"].get("estimator") == "debiased"
+            linestyle = "--" if is_debiased else "-"
+            alpha = self._style.curve_alpha if cs.get("is_individual") else 1.0
+
+            color = (
+                cmap(norm(cs["facets"]["sel_band_mid"]))
+                if uses_colorbar
+                else cat_color[(cs["facets"].get("mask"), cs["facets"].get("method"))]
             )
 
-        cf4_stats = aggregate_stats(cf4_df)
-        uniform_stats = aggregate_stats(uniform_df)
-        full_stats = aggregate_stats(full_df)
+            label_str = facet_set.legend_label(cs["facets"])
+            label = label_str if (label_str and label_str not in labels_drawn) else None
+            if label:
+                labels_drawn.add(label_str)
 
-        (cf4_line,) = plt.plot(
-            cf4_stats["radius"],
-            cf4_stats["U_mean"],
-            marker=marker_cf4,
-            label="CF4 (mean)",
-        )
-
-        (uniform_line,) = plt.plot(
-            uniform_stats["radius"],
-            uniform_stats["U_mean"],
-            marker=marker_uniform,
-            label="Uniform (mean)",
-        )
-
-        (full_line,) = plt.plot(
-            full_stats["radius"],
-            full_stats["U_mean"],
-            marker=marker_full,
-            label="Full (mean)",
-        )
-
-        # Debiased curves: dashed, same color as the parent solid curve.
-        # Only drawn when U_debiased is present and has at least one finite value
-        # (it is NaN for the mean estimator, so the curve is silently skipped).
-        if has_debiased:
-            for stats, line, mask_label in (
-                (cf4_stats, cf4_line, "CF4"),
-                (uniform_stats, uniform_line, "Uniform"),
-                (full_stats, full_line, "Full"),
-            ):
-                if "U_deb_mean" in stats.columns and stats["U_deb_mean"].notna().any():
-                    plt.plot(
-                        stats["radius"],
-                        stats["U_deb_mean"],
-                        "--",
-                        color=line.get_color(),
-                        linewidth=style.curve_linewidth,
-                        label=f"{mask_label} (debiased)",
-                    )
-
-        if plot_variance_band:
-            plt.fill_between(
-                cf4_stats["radius"],
-                cf4_stats["U_mean"] - cf4_stats["U_std"],
-                cf4_stats["U_mean"] + cf4_stats["U_std"],
-                alpha=variance_alpha,
-                label="CF4 ±1σ",
+            ax.plot(
+                radii,
+                values,
+                color=color,
+                linestyle=linestyle,
+                linewidth=self._style.curve_linewidth,
+                alpha=alpha,
+                marker=marker,
+                label=label,
             )
 
-            plt.fill_between(
-                uniform_stats["radius"],
-                uniform_stats["U_mean"] - uniform_stats["U_std"],
-                uniform_stats["U_mean"] + uniform_stats["U_std"],
-                alpha=variance_alpha,
-                label="Uniform ±1σ",
-            )
+            if cs.get("std") is not None and self._plot_variance_band:
+                ax.fill_between(
+                    radii,
+                    values - cs["std"],
+                    values + cs["std"],
+                    color=color,
+                    alpha=self._variance_alpha,
+                )
 
-            plt.fill_between(
-                full_stats["radius"],
-                full_stats["U_mean"] - full_stats["U_std"],
-                full_stats["U_mean"] + full_stats["U_std"],
-                alpha=variance_alpha,
-                label="Full ±1σ",
-            )
+        if not uses_colorbar:
+            return None
 
-    # --------------------------------------------------
-    # Theory
-    # --------------------------------------------------
-    if plot_theory:
-        radii = np.sort(df["radius"].unique())
+        sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        return sm
+
+    def _draw_theory(self, ax, radii: np.ndarray) -> None:
         sigma_v = theoretical_bulkflow_colossus(
             radii=radii,
-            cosmology_cfg=cosmology_cfg,
-            theory_cfg=theory_cfg,
+            cosmology_cfg=self._cosmology_cfg,
+            theory_cfg=self._theory_cfg,
         )
-
-        if use_mean_amplitude:
-            U_theory = cosmology_cfg.bulk_flow_amplitude_factor * sigma_v
-            theory_label = r"$\Lambda$CDM $\langle |U| \rangle$"
+        if self._use_mean_amplitude:
+            U_theory = self._cosmology_cfg.bulk_flow_amplitude_factor * sigma_v
+            label = r"$\Lambda$CDM $\langle |U| \rangle$"
         else:
             U_theory = sigma_v
-            theory_label = r"$\Lambda$CDM $\sigma_v$"
-
-        plt.plot(
+            label = r"$\Lambda$CDM $\sigma_v$"
+        ax.plot(
             radii,
             U_theory,
-            "--",
-            linewidth=style.theory_linewidth,
-            label=theory_label,
+            "k--",
+            linewidth=self._style.theory_linewidth,
+            label=label,
         )
 
-    # --------------------------------------------------
-    # Final styling
-    # --------------------------------------------------
-    plt.xlabel(r"Radius [$h^{-1}$ Mpc]")
-    plt.ylabel(r"$|U|$ [km/s]")
-    plt.title("Bulk Flow vs Radius")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
+    def _draw_textbox(self, ax, facet_set: FacetSet) -> None:
+        text = facet_set.textbox_text()
+        if not text:
+            return
+        ax.text(
+            self._TEXTBOX_X,
+            self._TEXTBOX_Y,
+            text,
+            transform=ax.transAxes,
+            fontsize=self._TEXTBOX_FONTSIZE,
+            verticalalignment="top",
+            bbox=dict(boxstyle="round", alpha=self._TEXTBOX_ALPHA, facecolor="white"),
+        )
 
-    os.makedirs(output_folder, exist_ok=True)
-    plt.savefig(os.path.join(output_folder, output_file), dpi=style.dpi_normal)
-    plt.close()
+    def _auto_filename(self, facet_set: FacetSet) -> str:
+        suffix = facet_set.filename_suffix()
+        base = "bulkflow_vs_radius"
+        return f"{base}__{suffix}.png" if suffix else f"{base}.png"
 
+
+# ===========================================================================
+# Histogram
+# ===========================================================================
 
 def plot_histogram(
-        data_df,
-        output_folder="plots",
-        output_file="cf4_histogram_lin.png",
-        key="distance",
-        origin: tuple[float, float, float] | None = None,
-        box_size: float | None = None,
-        bins=None,
-        log_axis=False,
-        style: PlotStyleConfig = None,
-        ):
+    data_df: pd.DataFrame,
+    output_folder: str = "plots",
+    output_file: str = "cf4_histogram_lin.png",
+    key: str = "distance",
+    origin: tuple[float, float, float] | None = None,
+    box_size: float | None = None,
+    bins=None,
+    log_axis: str | bool = False,
+    style: PlotStyleConfig | None = None,
+) -> None:
 
     if style is None:
         style = PlotStyleConfig()
@@ -384,22 +561,19 @@ def plot_histogram(
     if bins is None:
         bins = style.histogram_bins
 
-    # Check for 'distance' column; calculate if missing
     if key == "distance" and key not in data_df.columns:
         if all(col in data_df.columns for col in ["x", "y", "z"]):
             data_df = add_periodic_distance(
                 df=data_df,
                 origin=origin,
                 box_size=box_size,
-                distance_col="distance"
+                distance_col="distance",
             )
         else:
             raise KeyError(
                 "The dataframe is missing 'distance' and cannot find 'x, y, z' to calculate it."
             )
 
-
-    # Plotting
     plt.figure(figsize=style.histogram_figsize)
     plt.hist(data_df[key], bins=bins)
 
@@ -414,13 +588,17 @@ def plot_histogram(
     plt.xlabel(key.replace("_", " ").capitalize())
     plt.ylabel("Number of Objects")
     plt.title(output_file.replace("_", " ").replace(".png", ""))
-    plt.grid(True, linestyle='--', alpha=style.grid_alpha)
+    plt.grid(True, linestyle="--", alpha=style.grid_alpha)
 
     os.makedirs(output_folder, exist_ok=True)
     output_path = os.path.join(output_folder, output_file)
     plt.savefig(output_path, dpi=style.dpi_normal)
     plt.close()
 
+
+# ===========================================================================
+# Simulation slice heatmap
+# ===========================================================================
 
 def plot_simulation_slice_heatmap(
     df: pd.DataFrame,
@@ -435,56 +613,21 @@ def plot_simulation_slice_heatmap(
     dpi: int = 300,
     heatmap_cfg: SimulationSliceHeatmapConfig | None = None,
 ) -> None:
-    """
-    Plot a hexbin heatmap of a thin slice of the simulation box.
+    """Plot a hexbin heatmap of a thin slice of the simulation box."""
 
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Halo catalogue with columns x, y, z.
-    slice_axis : str
-        Axis to slice on ("x", "y", or "z").
-    slice_min, slice_max : float
-        Slice boundaries (e.g. 400 < z < 500).
-    proj_axes : tuple
-        Two axes to project onto, e.g. ("x", "y"), ("x", "z").
-    gridsize : int
-        Hexbin resolution.
-    cmap : str
-        Matplotlib colormap.
-    output_folder : str
-        Directory to save the plot.
-    output_file : str or None
-        Output filename. If None, auto-generated.
-    dpi : int
-        Output image DPI.
-    """
-
-    # ---------------------------------------
-    # Safety checks
-    # ---------------------------------------
     for col in (*proj_axes, slice_axis):
         if col not in df.columns:
             raise KeyError(f"Column '{col}' not found in DataFrame")
 
-    # ---------------------------------------
-    # Slice the data
-    # ---------------------------------------
     slice_df = df[
-        (df[slice_axis] >= slice_min) &
-        (df[slice_axis] < slice_max)
+        (df[slice_axis] >= slice_min) & (df[slice_axis] < slice_max)
     ]
-
     n_halos = len(slice_df)
 
-    # ---------------------------------------
-    # Plot
-    # ---------------------------------------
     if heatmap_cfg is None:
         heatmap_cfg = SimulationSliceHeatmapConfig()
 
     fig, ax = plt.subplots(figsize=heatmap_cfg.heatmap_figsize)
-
     fig.patch.set_facecolor("black")
     ax.set_facecolor("black")
 
@@ -504,16 +647,12 @@ def plot_simulation_slice_heatmap(
     ax.set_ylabel(proj_axes[1], color="white")
     ax.set_title(
         f"{slice_axis} ∈ [{slice_min}, {slice_max}) | Halos: {n_halos}",
-        color="white"
+        color="white",
     )
-
     ax.tick_params(colors="white")
 
     plt.tight_layout()
 
-    # ---------------------------------------
-    # Save
-    # ---------------------------------------
     os.makedirs(output_folder, exist_ok=True)
 
     if output_file is None:
@@ -522,224 +661,5 @@ def plot_simulation_slice_heatmap(
             f"{slice_axis}_{slice_min}_{slice_max}.png"
         )
 
-    output_path = os.path.join(output_folder, output_file)
-    plt.savefig(output_path, dpi=dpi)
+    plt.savefig(os.path.join(output_folder, output_file), dpi=dpi)
     plt.close()
-
-
-#=======================================================
-# netCDF-backed bulk flow plot
-#=======================================================
-def plot_bulkflow_from_nc(
-    nc_file: str,
-    output_folder: str,
-    method: str = "chi2",
-    output_file: str = "bulkflow_vs_radius.png",
-    plot_theory: bool = True,
-    use_mean_amplitude: bool = True,
-    plot_variance_band: bool = False,
-    variance_alpha: float = None,
-    plot_all_curves: bool = False,
-    show_markers: bool = True,
-    cosmology_cfg: CosmologyConfig = None,
-    theory_cfg: TheoryConfig = None,
-    style: PlotStyleConfig = None,
-) -> None:
-    """
-    Plot bulk flow results from a netCDF file written by BulkFlowDataset.write().
-
-    Thin wrapper: opens the file, converts to a tidy DataFrame, then delegates
-    to plot_bulkflow_from_hdf5.
-    """
-    from .data.bulkflow_dataset import BulkFlowDataset
-
-    bfd = BulkFlowDataset.open(nc_file)
-    df = bfd.to_tidy_dataframe(method=method)
-
-    plot_bulkflow_from_hdf5(
-        df=df,
-        output_folder=output_folder,
-        output_file=output_file,
-        plot_theory=plot_theory,
-        use_mean_amplitude=use_mean_amplitude,
-        plot_variance_band=plot_variance_band,
-        variance_alpha=variance_alpha,
-        plot_all_curves=plot_all_curves,
-        show_markers=show_markers,
-        cosmology_cfg=cosmology_cfg,
-        theory_cfg=theory_cfg,
-        style=style,
-    )
-
-
-#=======================================================
-# plot
-#=======================================================
-def plot_bulkflow_from_csv(
-    csv_file: str,
-    output_folder: str | None = None,
-    variable_name: str = "band",
-    var_min: float | int = 0,
-    var_max: float | int = 1,
-    var_step: float | int = 1,
-    output_file: str | None = None,
-    plot_theory: bool = True,
-    plot_errors: bool = False,
-    error_alpha: float = None,
-    show_markers: bool = False,
-    cosmology_cfg: CosmologyConfig = None,
-    style: PlotStyleConfig = None,
-):
-    """
-    Generic bulk-flow plotting function conditioned on an arbitrary variable.
-
-    Parameters
-    ----------
-    variable_name : str
-        Name used in CSV column prefix:
-        expected format: V_{variable_name}_{low}_to_{high}_mean
-
-    var_min, var_max, var_step :
-        Range used for color normalization.
-
-    plot_errors : bool
-        If True, plot ±1σ shaded bands.
-
-    show_markers : bool
-        If True, show markers on curves.
-    """
-
-    import os
-    import re
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import matplotlib as mpl
-
-    if style is None:
-        style = PlotStyleConfig()
-    if error_alpha is None:
-        error_alpha = style.curve_alpha
-    if cosmology_cfg is None:
-        cosmology_cfg = CosmologyConfig()
-
-    # --------------------------------------------------
-    # Resolve output folder
-    # --------------------------------------------------
-    if output_folder is None:
-        output_folder = os.path.dirname(csv_file)
-
-    if output_file is None:
-        output_file = f"bulkflow_vs_radius_{variable_name}.png"
-
-    # --------------------------------------------------
-    # Load CSV
-    # --------------------------------------------------
-    df = pd.read_csv(csv_file)
-    radii = df["radius"].values
-
-    # --------------------------------------------------
-    # Identify bands from column names
-    # Expected: V_{variable_name}_{low}_to_{high}_mean
-    # --------------------------------------------------
-    pattern = re.compile(
-        rf"V_band_(\-?\d+\.?\d*)_to_(\-?\d+\.?\d*)_mean"
-    )
-
-    bands = []
-
-    for col in df.columns:
-        m = pattern.match(col)
-        if m:
-            low = float(m.group(1))
-            high = float(m.group(2))
-            bands.append((low, high, col))
-
-    if not bands:
-        raise ValueError(
-            f"No matching columns found for variable '{variable_name}'."
-        )
-
-    bands.sort(key=lambda x: x[0])
-
-    # --------------------------------------------------
-    # Colormap normalization
-    # --------------------------------------------------
-    cmap = plt.cm.coolwarm
-
-    # Use symmetric normalization only if variable crosses zero
-    if var_min < 0 < var_max:
-        norm = mpl.colors.TwoSlopeNorm(
-            vmin=var_min,
-            vcenter=0.0,
-            vmax=var_max,
-        )
-    else:
-        norm = mpl.colors.Normalize(vmin=var_min, vmax=var_max)
-
-    marker = "o" if show_markers else None
-
-    fig, ax = plt.subplots(figsize=style.bulkflow_figsize)
-
-    # --------------------------------------------------
-    # Plot bands
-    # --------------------------------------------------
-    for low, high, mean_col in bands:
-
-        std_col = mean_col.replace("_mean", "_std")
-        mid = 0.5 * (low + high)
-        color = cmap(norm(mid))
-
-        ax.plot(
-            radii,
-            df[mean_col],
-            color=color,
-            linewidth=style.theory_linewidth,
-            marker=marker,
-        )
-
-        if plot_errors and std_col in df.columns:
-            ax.fill_between(
-                radii,
-                df[mean_col] - df[std_col],
-                df[mean_col] + df[std_col],
-                color=color,
-                alpha=error_alpha,
-            )
-
-    # --------------------------------------------------
-    # Theory
-    # --------------------------------------------------
-    if plot_theory and "U_mean_theory" in df.columns:
-        ax.plot(
-            radii,
-            df["U_mean_theory"],
-            "k--",
-            linewidth=style.csv_theory_linewidth,
-            label=r"$\Lambda$CDM $\langle |U| \rangle$",
-        )
-        ax.legend()
-
-    # --------------------------------------------------
-    # Colorbar
-    # --------------------------------------------------
-    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=ax)
-    cbar.set_label(variable_name)
-
-    # --------------------------------------------------
-    # Styling
-    # --------------------------------------------------
-    ax.set_xlabel(r"Radius [$h^{-1}$ Mpc]")
-    ax.set_ylabel(r"$\langle |U| \rangle$ [km/s]")
-    ax.set_title(
-        f"Bulk Flow vs Radius\nConditioned on {variable_name}"
-    )
-    ax.grid(True)
-
-    fig.tight_layout()
-
-    os.makedirs(output_folder, exist_ok=True)
-    fig.savefig(os.path.join(output_folder, output_file), dpi=style.dpi_normal)
-    plt.close(fig)

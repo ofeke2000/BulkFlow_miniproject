@@ -17,7 +17,7 @@ import logging
 
 from src.data.bulkflow_dataset import BulkFlowDataset
 from src.theoretical_bulkflow import theoretical_bulkflow_colossus
-from src.visualize import plot_bulkflow_from_csv, plot_bulkflow_from_nc
+from src.visualize import BulkFlowPlotter
 from src.classes import AppConfig
 
 
@@ -66,7 +66,7 @@ def aggregate_results(cfg: AppConfig) -> None:
     grouped_mean = U_tot_sel.groupby_bins(sel_coord, bins=bin_edges).mean("origin")
     grouped_std = U_tot_sel.groupby_bins(sel_coord, bins=bin_edges).std("origin")
 
-    # Build unified CSV in the format expected by plot_bulkflow_from_csv
+    # Build unified CSV (per-band mean/std + theory) for external analysis
     csv_data: dict = {"radius": radii}
 
     intervals = grouped_mean.coords[bin_dim].values
@@ -92,41 +92,29 @@ def aggregate_results(cfg: AppConfig) -> None:
 
 def create_final_plots(cfg: AppConfig) -> None:
     """
-    Create final comparison plots from the aggregated CSV.
+    Create final comparison plots directly from the netCDF output.
 
-    The plot variable label comes from the dataset's selection_variable attribute
-    so that axis titles automatically reflect the running variable.
+    Origins are banded by the dataset's selection_variable using the bin edges
+    from PostprocessingConfig, and encoded as a colorbar.
     """
     nc_file = cfg.paths.output_file
     base_dir = cfg.paths.output_folder
-    csv_file = os.path.join(base_dir, "unified_results.csv")
     pp = cfg.postprocessing
 
-    if not os.path.exists(csv_file):
-        logging.error(f"Unified CSV file not found: {csv_file}")
+    if not os.path.exists(nc_file):
+        logging.error(f"netCDF file not found: {nc_file}")
         return
 
-    # Read selection_variable from the netCDF attrs so the plot label is correct
-    variable_name = pp.selection_variable
-    if os.path.exists(nc_file):
-        try:
-            bfd = BulkFlowDataset.open(nc_file)
-            variable_name = bfd.dataset.attrs.get("selection_variable", variable_name)
-        except Exception:
-            pass
+    band_bins = np.arange(pp.band_min, pp.band_max + pp.band_step, pp.band_step)
 
-    plot_bulkflow_from_csv(
-        csv_file=csv_file,
+    BulkFlowPlotter(
+        nc_file=nc_file,
         output_folder=base_dir,
-        variable_name=variable_name,
-        var_min=pp.var_min,
-        var_max=pp.var_max,
-        var_step=pp.var_step,
         output_file="bulkflow_comparison.png",
+        band_bins=band_bins,
         plot_theory=True,
-        plot_errors=False,
-        error_alpha=pp.error_alpha,
         show_markers=False,
         cosmology_cfg=cfg.cosmology,
+        theory_cfg=cfg.theory,
         style=cfg.visualization.style,
-    )
+    ).plot()

@@ -133,7 +133,12 @@ General utility functions:
 - Dataframe saving
 
 #### visualize.py
-Plotting and visualization functions for histograms, bulk flow curves, and simulation slices.
+Visualization utilities. Bulk-flow plotting is consolidated in two classes:
+
+- `FacetSet` — classifies each facet (mask / method / estimator / sigma\_star / N / selection\_variable) as CONSTANT or VARYING across the curves in a figure. Constant facets go to the output filename and a corner annotation box; varying categorical facets go to legend labels; a varying selection-variable band goes to a colorbar.
+- `BulkFlowPlotter` — reads directly from a `BulkFlowDataset` netCDF. Supports mean-over-origins mode, all-curves mode, and banded mode (`band_bins` triggers `groupby_bins` by the dataset's `selection_variable`). Assigns colors from the default prop cycle for categorical facets, or from a colormap when the selection-variable band varies. Four layout constants (`_TEXTBOX_X/Y`, `_TEXTBOX_FONTSIZE`, `_TEXTBOX_ALPHA`, `_COLORBAR_PAD`) live as class attributes.
+
+Module-level helpers retained: `plot_histogram`, `plot_simulation_slice_heatmap`.
 
 ## data/
 

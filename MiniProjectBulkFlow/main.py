@@ -13,7 +13,7 @@ from scripts.environment_analysis import compute_environmental_tests
 from scripts.origin_selection import select_origin_points
 from scripts.bulkflow_computation import compute_bulkflows_for_origins
 from scripts.postprocessing import aggregate_results, create_final_plots
-from src.visualize import plot_bulkflow_from_nc
+from src.visualize import BulkFlowPlotter
 
 
 def main():
@@ -76,10 +76,10 @@ def main():
     output_folder = cfg.paths.output_folder
     output_file = cfg.paths.output_file
 
-    plot_bulkflow_from_nc(
+    BulkFlowPlotter(
         nc_file=output_file,
         output_folder=output_folder,
-        method=cfg.bulkflow.calculation_method,
+        methods=[cfg.bulkflow.calculation_method],
         output_file=f"bulkflow_vs_radius_local_bulkflow_[{bulkflow_lower_cut:.0f},{bulkflow_upper_cut:.0f}].png",
         plot_theory=True,
         use_mean_amplitude=True,
@@ -89,7 +89,7 @@ def main():
         cosmology_cfg=cfg.cosmology,
         theory_cfg=cfg.theory,
         style=cfg.visualization.style,
-    )
+    ).plot()
 
     # ==========================================================
     # END — FINAL TIMING SUMMARY
