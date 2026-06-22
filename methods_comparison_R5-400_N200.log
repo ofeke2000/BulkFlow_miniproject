@@ -1,0 +1,274 @@
+nohup: ignoring input
+16:57:35 | INFO | Loading config from config.yaml
+16:57:35 | INFO | Loading Rockstar catalog...
+16:57:40 | INFO | Rockstar catalog loaded and prepared.
+16:57:40 | INFO | Building cKDTree...
+16:57:43 | INFO | cKDTree built successfully.
+16:57:44 | INFO | Selected 200 origins by lowest |delta_3| (range 2.042e-04 – 2.382e-04).
+16:57:51 | INFO | Origin 1/200 (id=12585888457) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+16:57:58 | INFO | Origin 2/200 (id=12671562747) computed.
+16:58:05 | INFO | Origin 3/200 (id=12672791752) computed.
+16:58:12 | INFO | Origin 4/200 (id=12597544730) computed.
+16:58:19 | INFO | Origin 5/200 (id=12650594595) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+16:58:27 | INFO | Origin 6/200 (id=12684021005) computed.
+16:58:34 | INFO | Origin 7/200 (id=12655692107) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+16:58:41 | INFO | Origin 8/200 (id=12690605093) computed.
+16:58:48 | INFO | Origin 9/200 (id=12589619633) computed.
+16:58:55 | INFO | Origin 10/200 (id=12605196882) computed.
+16:59:02 | INFO | Origin 11/200 (id=12624220014) computed.
+16:59:09 | INFO | Origin 12/200 (id=12581847433) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+16:59:16 | INFO | Origin 13/200 (id=12620050946) computed.
+16:59:23 | INFO | Origin 14/200 (id=12593545289) computed.
+16:59:30 | INFO | Origin 15/200 (id=12634223936) computed.
+16:59:37 | INFO | Origin 16/200 (id=12697018027) computed.
+16:59:44 | INFO | Origin 17/200 (id=12653783332) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+16:59:51 | INFO | Origin 18/200 (id=12693254641) computed.
+16:59:58 | INFO | Origin 19/200 (id=12621304342) computed.
+17:00:05 | INFO | Origin 20/200 (id=12585265506) computed.
+17:00:12 | INFO | Origin 21/200 (id=12623606613) computed.
+17:00:19 | INFO | Origin 22/200 (id=12651256479) computed.
+17:00:26 | INFO | Origin 23/200 (id=12598727693) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:00:33 | INFO | Origin 24/200 (id=12693254542) computed.
+17:00:40 | INFO | Origin 25/200 (id=12610843440) computed.
+17:00:47 | INFO | Origin 26/200 (id=12694787556) computed.
+17:00:54 | INFO | Origin 27/200 (id=12601508445) computed.
+17:01:01 | INFO | Origin 28/200 (id=12593563616) computed.
+17:01:08 | INFO | Origin 29/200 (id=12637737581) computed.
+17:01:15 | INFO | Origin 30/200 (id=12597433583) computed.
+17:01:22 | INFO | Origin 31/200 (id=12599192578) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:01:29 | INFO | Origin 32/200 (id=12586175132) computed.
+17:01:36 | INFO | Origin 33/200 (id=12671563964) computed.
+17:01:43 | INFO | Origin 34/200 (id=12686863396) computed.
+17:01:50 | INFO | Origin 35/200 (id=12606994264) computed.
+17:01:57 | INFO | Origin 36/200 (id=12686863397) computed.
+17:02:04 | INFO | Origin 37/200 (id=12628076967) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:02:11 | INFO | Origin 38/200 (id=12570839856) computed.
+17:02:18 | INFO | Origin 39/200 (id=12642801118) computed.
+17:02:25 | INFO | Origin 40/200 (id=12598579880) computed.
+17:02:32 | INFO | Origin 41/200 (id=12704906988) computed.
+17:02:39 | INFO | Origin 42/200 (id=12653781291) computed.
+17:02:46 | INFO | Origin 43/200 (id=12648548563) computed.
+17:02:53 | INFO | Origin 44/200 (id=12682687009) computed.
+17:03:00 | INFO | Origin 45/200 (id=12598727818) computed.
+17:03:07 | INFO | Origin 46/200 (id=12663512458) computed.
+17:03:15 | INFO | Origin 47/200 (id=12697266072) computed.
+17:03:22 | INFO | Origin 48/200 (id=12584904151) computed.
+17:03:29 | INFO | Origin 49/200 (id=12645694323) computed.
+17:03:36 | INFO | Origin 50/200 (id=12633392750) computed.
+17:03:43 | INFO | Origin 51/200 (id=12601255465) computed.
+17:03:50 | INFO | Origin 52/200 (id=12596703402) computed.
+17:03:57 | INFO | Origin 53/200 (id=12663513295) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:04:04 | INFO | Origin 54/200 (id=12690605197) computed.
+17:04:11 | INFO | Origin 55/200 (id=12645694963) computed.
+17:04:18 | INFO | Origin 56/200 (id=12580561368) computed.
+17:04:25 | INFO | Origin 57/200 (id=12640826187) computed.
+17:04:32 | INFO | Origin 58/200 (id=12601254668) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:04:39 | INFO | Origin 59/200 (id=12591186640) computed.
+17:04:46 | INFO | Origin 60/200 (id=12684021573) computed.
+17:04:53 | INFO | Origin 61/200 (id=12613546419) computed.
+17:05:00 | INFO | Origin 62/200 (id=12704550694) computed.
+17:05:07 | INFO | Origin 63/200 (id=12614007168) computed.
+17:05:14 | INFO | Origin 64/200 (id=12587652443) computed.
+17:05:21 | INFO | Origin 65/200 (id=12587653369) computed.
+17:05:28 | INFO | Origin 66/200 (id=12633393472) computed.
+17:05:35 | INFO | Origin 67/200 (id=12590708380) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:05:42 | INFO | Origin 68/200 (id=12633029240) computed.
+17:05:49 | INFO | Origin 69/200 (id=12590708732) computed.
+17:05:56 | INFO | Origin 70/200 (id=12640825913) computed.
+17:06:03 | INFO | Origin 71/200 (id=12666505998) computed.
+17:06:10 | INFO | Origin 72/200 (id=12597433580) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:06:17 | INFO | Origin 73/200 (id=12633028972) computed.
+17:06:25 | INFO | Origin 74/200 (id=12685198876) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:06:32 | INFO | Origin 75/200 (id=12591186636) computed.
+17:06:39 | INFO | Origin 76/200 (id=12659936916) computed.
+17:06:46 | INFO | Origin 77/200 (id=12621305796) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:06:53 | INFO | Origin 78/200 (id=12620049931) computed.
+17:07:00 | INFO | Origin 79/200 (id=12581848053) computed.
+17:07:07 | INFO | Origin 80/200 (id=12655693049) computed.
+17:07:14 | INFO | Origin 81/200 (id=12629602260) computed.
+17:07:21 | INFO | Origin 82/200 (id=12606995529) computed.
+17:07:28 | INFO | Origin 83/200 (id=12672792417) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:07:35 | INFO | Origin 84/200 (id=12704908246) computed.
+17:07:42 | INFO | Origin 85/200 (id=12627672591) computed.
+17:07:49 | INFO | Origin 86/200 (id=12614006713) computed.
+17:07:56 | INFO | Origin 87/200 (id=12694788812) computed.
+17:08:03 | INFO | Origin 88/200 (id=12701174671) computed.
+17:08:10 | INFO | Origin 89/200 (id=12631310285) computed.
+17:08:17 | INFO | Origin 90/200 (id=12584904102) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:08:24 | INFO | Origin 91/200 (id=12586176349) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:08:31 | INFO | Origin 92/200 (id=12570839487) computed.
+17:08:38 | INFO | Origin 93/200 (id=12601509700) computed.
+17:08:45 | INFO | Origin 94/200 (id=12639254623) computed.
+17:08:52 | INFO | Origin 95/200 (id=12697263986) computed.
+17:08:59 | INFO | Origin 96/200 (id=12605198205) computed.
+17:09:06 | INFO | Origin 97/200 (id=12704549329) computed.
+17:09:13 | INFO | Origin 98/200 (id=12629601089) computed.
+17:09:20 | INFO | Origin 99/200 (id=12622599995) computed.
+17:09:27 | INFO | Origin 100/200 (id=12664123381) computed.
+17:09:34 | INFO | Origin 101/200 (id=12659938406) computed.
+17:09:41 | INFO | Origin 102/200 (id=12692382702) computed.
+17:09:48 | INFO | Origin 103/200 (id=12682181420) computed.
+17:09:55 | INFO | Origin 104/200 (id=12661508533) computed.
+17:10:02 | INFO | Origin 105/200 (id=12678600912) computed.
+17:10:09 | INFO | Origin 106/200 (id=12683659597) computed.
+17:10:16 | INFO | Origin 107/200 (id=12701071343) computed.
+17:10:23 | INFO | Origin 108/200 (id=12609898995) computed.
+17:10:30 | INFO | Origin 109/200 (id=12606477095) computed.
+17:10:37 | INFO | Origin 110/200 (id=12698452697) computed.
+17:10:44 | INFO | Origin 111/200 (id=12580197084) computed.
+17:10:51 | INFO | Origin 112/200 (id=12693854062) computed.
+17:10:58 | INFO | Origin 113/200 (id=12699839384) computed.
+17:11:05 | INFO | Origin 114/200 (id=12600042102) computed.
+17:11:12 | INFO | Origin 115/200 (id=12700237919) computed.
+17:11:19 | INFO | Origin 116/200 (id=12597289514) computed.
+17:11:26 | INFO | Origin 117/200 (id=12605196692) computed.
+17:11:33 | INFO | Origin 118/200 (id=12663153913) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:11:40 | INFO | Origin 119/200 (id=12686298951) computed.
+17:11:47 | INFO | Origin 120/200 (id=12609455485) computed.
+17:11:54 | INFO | Origin 121/200 (id=12669812723) computed.
+17:12:01 | INFO | Origin 122/200 (id=12646855532) computed.
+17:12:08 | INFO | Origin 123/200 (id=12586065417) computed.
+17:12:15 | INFO | Origin 124/200 (id=12598062119) computed.
+17:12:22 | INFO | Origin 125/200 (id=12580453782) computed.
+17:12:29 | INFO | Origin 126/200 (id=12572194516) computed.
+17:12:36 | INFO | Origin 127/200 (id=12639435800) computed.
+17:12:43 | INFO | Origin 128/200 (id=12668625407) computed.
+17:12:50 | INFO | Origin 129/200 (id=12635126217) computed.
+17:12:57 | INFO | Origin 130/200 (id=12586438374) computed.
+17:13:04 | INFO | Origin 131/200 (id=12580452802) computed.
+17:13:11 | INFO | Origin 132/200 (id=12692496965) computed.
+17:13:18 | INFO | Origin 133/200 (id=12586065418) computed.
+17:13:26 | INFO | Origin 134/200 (id=12640362949) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:13:33 | INFO | Origin 135/200 (id=12621692234) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:13:40 | INFO | Origin 136/200 (id=12622884659) computed.
+17:13:47 | INFO | Origin 137/200 (id=12659154133) computed.
+17:13:54 | INFO | Origin 138/200 (id=12679482173) computed.
+17:14:01 | INFO | Origin 139/200 (id=12690742598) computed.
+17:14:08 | INFO | Origin 140/200 (id=12590526433) computed.
+17:14:15 | INFO | Origin 141/200 (id=12620515496) computed.
+17:14:22 | INFO | Origin 142/200 (id=12596668518) computed.
+17:14:29 | INFO | Origin 143/200 (id=12672825742) computed.
+17:14:36 | INFO | Origin 144/200 (id=12585157411) computed.
+17:14:43 | INFO | Origin 145/200 (id=12700236854) computed.
+17:14:50 | INFO | Origin 146/200 (id=12593545512) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:14:57 | INFO | Origin 147/200 (id=12670455930) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:15:04 | INFO | Origin 148/200 (id=12691362928) computed.
+17:15:11 | INFO | Origin 149/200 (id=12603013967) computed.
+17:15:18 | INFO | Origin 150/200 (id=12691037836) computed.
+17:15:24 | INFO | Origin 151/200 (id=12698554369) computed.
+17:15:32 | INFO | Origin 152/200 (id=12654398297) computed.
+17:15:38 | INFO | Origin 153/200 (id=12603413081) computed.
+17:15:45 | INFO | Origin 154/200 (id=12694055052) computed.
+17:15:52 | INFO | Origin 155/200 (id=12594967352) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 3 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:15:59 | INFO | Origin 156/200 (id=12608655099) computed.
+17:16:06 | INFO | Origin 157/200 (id=12692240620) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 2 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:16:13 | INFO | Origin 158/200 (id=12695999722) computed.
+17:16:20 | INFO | Origin 159/200 (id=12678632730) computed.
+17:16:27 | INFO | Origin 160/200 (id=12702388329) computed.
+17:16:34 | INFO | Origin 161/200 (id=12702529380) computed.
+17:16:41 | INFO | Origin 162/200 (id=12606366452) computed.
+17:16:48 | INFO | Origin 163/200 (id=12582948858) computed.
+17:16:55 | INFO | Origin 164/200 (id=12678137250) computed.
+17:17:02 | INFO | Origin 165/200 (id=12628954199) computed.
+17:17:09 | INFO | Origin 166/200 (id=12610045530) computed.
+17:17:16 | INFO | Origin 167/200 (id=12704802530) computed.
+17:17:23 | INFO | Origin 168/200 (id=12692496723) computed.
+17:17:30 | INFO | Origin 169/200 (id=12616142563) computed.
+17:17:37 | INFO | Origin 170/200 (id=12702983601) computed.
+17:17:45 | INFO | Origin 171/200 (id=12572959027) computed.
+17:17:51 | INFO | Origin 172/200 (id=12648548944) computed.
+17:17:58 | INFO | Origin 173/200 (id=12658763890) computed.
+17:18:05 | INFO | Origin 174/200 (id=12696908803) computed.
+17:18:12 | INFO | Origin 175/200 (id=12700855549) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 2 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:18:19 | INFO | Origin 176/200 (id=12695518313) computed.
+17:18:26 | INFO | Origin 177/200 (id=12603121737) computed.
+17:18:33 | INFO | Origin 178/200 (id=12705635491) computed.
+17:18:40 | INFO | Origin 179/200 (id=12705107651) computed.
+17:18:47 | INFO | Origin 180/200 (id=12698161190) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:18:55 | INFO | Origin 181/200 (id=12622385851) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 2 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:19:02 | INFO | Origin 182/200 (id=12705992367) computed.
+17:19:09 | INFO | Origin 183/200 (id=12691036402) computed.
+17:19:16 | INFO | Origin 184/200 (id=12583647576) computed.
+17:19:24 | INFO | Origin 185/200 (id=12696275060) computed.
+17:19:31 | INFO | Origin 186/200 (id=12609644009) computed.
+17:19:38 | INFO | Origin 187/200 (id=12701071787) computed.
+17:19:45 | INFO | Origin 188/200 (id=12687244516) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:122: RuntimeWarning: invalid value encountered in sqrt
+  sigma_U = float(np.sqrt(u @ cov @ u)) / U
+17:19:52 | INFO | Origin 189/200 (id=12574977623) computed.
+17:19:59 | INFO | Origin 190/200 (id=12630474179) computed.
+17:20:06 | INFO | Origin 191/200 (id=12682796527) computed.
+17:20:13 | INFO | Origin 192/200 (id=12705460902) computed.
+17:20:21 | INFO | Origin 193/200 (id=12624661399) computed.
+17:20:28 | INFO | Origin 194/200 (id=12700566699) computed.
+17:20:36 | INFO | Origin 195/200 (id=12689598487) computed.
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/physics/bulkflow.py:116: LinAlgWarning: Diagonal number 2 is exactly zero. Singular matrix.
+  lu, piv = lu_factor(A)
+17:20:43 | INFO | Origin 196/200 (id=12694998492) computed.
+17:20:50 | INFO | Origin 197/200 (id=12695280542) computed.
+17:20:57 | INFO | Origin 198/200 (id=12688329269) computed.
+17:21:06 | INFO | Origin 199/200 (id=12690310798) computed.
+17:21:14 | INFO | Origin 200/200 (id=12684545709) computed.
+17:21:14 | INFO | Wrote dataset: /home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/methods comparison/methods_comparison_radii-5-400__N-200__mask-full__methods-chi2_mean__selection_variable-overdensity__sigma_star-250_0.nc
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/viz/visualize.py:232: FutureWarning: The return type of `Dataset.dims` will be changed to return a set of dimension names in future, in order to be more consistent with `DataArray.dims`. To access a mapping from dimension names to lengths, please use `Dataset.sizes`.
+  n_origins = ds.attrs.get("number_of_origins", ds.dims.get("origin"))
+17:21:19 | INFO | Saved bulk-flow plot: /home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/methods comparison/methods_comparison_chi2_mean_theory_radii-5-400__N-200__estimator-total__mask-full__selection_variable-overdensity__sigma_star-250_0.png
+/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/src/viz/visualize.py:232: FutureWarning: The return type of `Dataset.dims` will be changed to return a set of dimension names in future, in order to be more consistent with `DataArray.dims`. To access a mapping from dimension names to lengths, please use `Dataset.sizes`.
+  n_origins = ds.attrs.get("number_of_origins", ds.dims.get("origin"))
+17:21:24 | INFO | Saved bulk-flow plot: /home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/methods comparison/chi2_Utot_vs_Udeb_radii-5-400__N-200__mask-full__method-chi2__selection_variable-overdensity__sigma_star-250_0.png
+Loading Rockstar catalog from /home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv...
+Loaded 4,093,751 halos.

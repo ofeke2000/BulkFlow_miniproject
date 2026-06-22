@@ -146,6 +146,20 @@ class MethodsComparison:
     # Output
     # ------------------------------------------------------------------
 
+    def _radii_range_str(self) -> str:
+        """Compact 'min-max' radial-extent string for filenames."""
+        return f"{self.R_MIN:.0f}-{self.R_MAX:.0f}"
+
+    def _with_radii_tag(self, filename: str) -> str:
+        """
+        Insert the radial extent into a filename's base. The range is the
+        plot x-axis (not a corner-textbox constant), so it is not part of the
+        facet suffix — but it is a defining run parameter, so tagging it keeps
+        runs with different ranges from overwriting each other.
+        """
+        root, ext = os.path.splitext(filename)
+        return f"{root}_radii-{self._radii_range_str()}{ext}"
+
     def _dataset_filename(self, base_path: str) -> str:
         """
         Append the run's defining constants to the netCDF filename, using the
@@ -168,7 +182,7 @@ class MethodsComparison:
     def write_and_plot(self, dataset: BulkFlowDataset) -> None:
         """Persist the dataset and render the two comparison plots."""
         cfg = self._cfg
-        out_file = self._dataset_filename(cfg.paths.output_file)
+        out_file = self._dataset_filename(self._with_radii_tag(cfg.paths.output_file))
         out_folder = cfg.paths.output_folder
 
         dataset.write(out_file)
@@ -178,7 +192,7 @@ class MethodsComparison:
         BulkFlowPlotter(
             nc_file=out_file,
             output_folder=out_folder,
-            output_file=self.METHODS_PLOT_FILE,
+            output_file=self._with_radii_tag(self.METHODS_PLOT_FILE),
             methods=list(self.METHODS),
             plot_cfg=BulkFlowPlotConfig(plot_debiased=False, show_markers=False),
             cosmology_cfg=cfg.cosmology,
@@ -190,7 +204,7 @@ class MethodsComparison:
         BulkFlowPlotter(
             nc_file=out_file,
             output_folder=out_folder,
-            output_file=self.DEBIAS_PLOT_FILE,
+            output_file=self._with_radii_tag(self.DEBIAS_PLOT_FILE),
             methods=["chi2"],
             plot_cfg=BulkFlowPlotConfig(show_markers=False),
             cosmology_cfg=cfg.cosmology,
