@@ -17,6 +17,19 @@ class CosmologyConfig:
     growth_index: float = 0.55
 
     @property
+    def hubble_velocity_per_hinv_mpc(self) -> float:
+        """Hubble velocity in km/s per h⁻¹ Mpc: H0/h = 100 km/s per h⁻¹ Mpc.
+
+        Colossus returns P(k) in (h⁻¹ Mpc)³ and k in h/Mpc, so the velocity
+        prefactor in the bulk-flow integral must use H0/h rather than H0.
+        Since h ≡ H0/100 by definition, H0/h = 100 exactly.
+        """
+        # h ≡ H0 / 100 is the *definition* of the reduced Hubble parameter;
+        # the literal 100 here is that definition, not a tunable constant.
+        h = self.H0 / 100.0
+        return self.H0 / h
+
+    @property
     def bulk_flow_amplitude_factor(self) -> float:
         """Conversion from RMS velocity σ_v to mean bulk-flow amplitude ⟨|U|⟩ = factor * σ_v."""
         return np.sqrt(8.0 / (3.0 * np.pi))

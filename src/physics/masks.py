@@ -44,6 +44,7 @@ class MaskMaker:
         position: np.ndarray,
         radius: float | None = None,
         max_doublings: int = 4,
+        cf4_carry_columns: tuple[str, ...] = (),
     ) -> pd.DataFrame:
         """
         Create a CF4-like matched sample:
@@ -51,10 +52,19 @@ class MaskMaker:
         - keep halo properties
         - overwrite halo position with CF4 position
 
+        Parameters
+        ----------
+        cf4_carry_columns : tuple[str, ...], optional
+            Extra columns copied verbatim from ``self.cf4_df`` into each
+            matched row (e.g. ``('eDM_av', 'distance')`` for CF4
+            measurement-error propagation in downstream analyses). Empty by
+            default, so existing callers (``main.py``) are unaffected.
+
         Returns
         -------
         matched_halos : pandas.DataFrame
             Columns include halo properties + CF4 position + match_distance
+            (+ any ``cf4_carry_columns``)
         """
         if self.cf4_df is None:
             raise ValueError("cf4_df must be provided at construction for CF4 masking.")
@@ -62,8 +72,13 @@ class MaskMaker:
         if radius is None:
             radius = BulkFlowConfig().cf4_match_radius
 
+        missing_carry_columns = [c for c in cf4_carry_columns if c not in self.cf4_df.columns]
+        if missing_carry_columns:
+            raise KeyError(f"cf4_df is missing requested carry column(s): {missing_carry_columns}")
+
         cf4_shifted_xyz = (self.cf4_df[['x', 'y', 'z']].values + position) % self.box_size
         cf4_ids = self.cf4_df['id'].values
+        carry_values = {col: self.cf4_df[col].values for col in cf4_carry_columns}
 
         matched_rows = []
         used_indices = set()
@@ -100,7 +115,7 @@ class MaskMaker:
 
             halo = self.halos_df.iloc[j_closest]
 
-            matched_rows.append({
+            matched_row = {
                 'rockstarid': halo['rockstarid'],
                 'x': pos_cf4[0],
                 'y': pos_cf4[1],
@@ -111,7 +126,10 @@ class MaskMaker:
                 'mvir': halo.get('mvir', np.nan),
                 'cf4_id': cf4_id,
                 'match_distance': d_min,
-            })
+            }
+            for col in cf4_carry_columns:
+                matched_row[col] = carry_values[col][i]
+            matched_rows.append(matched_row)
 
             if (i + 1) % self.CF4_PROGRESS_INTERVAL == 0:
                 print(f"  Matched {i+1:,}/{len(self.cf4_df):,}")

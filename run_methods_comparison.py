@@ -11,8 +11,8 @@ folder.
 
 import logging
 
-from scripts.data_preprocessing import load_config, preprocess_data
-from scripts.methods_comparison import MethodsComparison
+from scripts.pipeline.data_preprocessing import load_config, preprocess_data
+from scripts.analyses.methods_comparison import MethodsComparison
 
 
 def main() -> None:

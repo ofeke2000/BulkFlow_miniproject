@@ -1,143 +1,67 @@
-import yaml
-import numpy as np
-import pandas as pd
+"""
+manual_post_processing.py
+-------------------------
+Re-run theoretical calculations and regenerate plots from an existing
+netCDF dataset without re-running the full pipeline.
+"""
+
 import logging
-import time
 import os
-from pathlib import Path
 
-from scipy.spatial import cKDTree
+from src.viz.visualize import BulkFlowPlotter
+from src.config import BulkFlowPlotConfig
+from src.config.cosmology_config import CosmologyConfig
+from src.config.theory_config import TheoryConfig
+from src.config.visualization_config import PlotStyleConfig
 
-# --- Local modules ---
-from src.data_loader import load_rockstar_catalog, load_cf4_catalogue
-from src.overdensity import OverdensityCalculator
-from src.masks import MaskMaker
-from src.bulkflow import calculate_bulk_flow_series, calculate_local_bulkflow
-from src.specific_utils import append_bulkflow_results, save_average_bulkflow_to_csv
-from src.visualize import plot_bulkflow_from_csv, plot_bulkflow_from_hdf5, plot_histogram, plot_simulation_slice_heatmap
-from src.near_virgo import near_virgo
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+
+NC_FILE = os.path.expanduser(
+    "~/BulkFlow_miniproject/BulkFlow_miniproject/output/methods comparison/"
+    "methods_comparison_radii-5-400__N-200__mask-full__methods-chi2_mean"
+    "__selection_variable-overdensity__sigma_star-250_0.nc"
+)
+OUTPUT_FOLDER = os.path.dirname(NC_FILE)
+
+METHODS_PLOT_FILE = "methods_comparison_chi2_mean_theory_radii-5-400.png"
+DEBIAS_PLOT_FILE = "chi2_Utot_vs_Udeb_radii-5-400.png"
+
 
 def main():
-    base_dir = os.path.expanduser(
-        "~/BulkFlow_miniproject/BulkFlow_miniproject/output/"
-        "local_bulkflow_cuts_rmax250_rmin10_jumps5"
-    )
+    cosmology_cfg = CosmologyConfig()
+    theory_cfg = TheoryConfig()
+    style = PlotStyleConfig()
 
-    csv_file = os.path.join(base_dir, "unified_results.csv")
+    # Plot 1: chi2 vs mean (U_tot) vs LCDM theory
+    BulkFlowPlotter(
+        nc_file=NC_FILE,
+        output_folder=OUTPUT_FOLDER,
+        output_file=METHODS_PLOT_FILE,
+        methods=["chi2", "mean"],
+        plot_cfg=BulkFlowPlotConfig(plot_debiased=False, show_markers=False),
+        cosmology_cfg=cosmology_cfg,
+        theory_cfg=theory_cfg,
+        style=style,
+    ).plot()
 
-    # Define overdensity band edges
-    band_edges = np.arange(0, 1600, 100) 
-
-    for low, high in zip(band_edges[:-1], band_edges[1:]):
-
-        def clean_float(x: float) -> float:
-            return 0.0 if np.isclose(x, 0.0) else x
-        
-        band_lo = low
-        band_hi = high
-
-        band_lo = clean_float(band_lo)
-        band_hi = clean_float(band_hi)
-
-        band_dir = f"{band_lo:.0f}-{band_hi:.0f}"
-        band_str = f"{band_lo:.0f}_to_{band_hi:.0f}"
-
-
-        hdf_file = os.path.join(
-            base_dir,
-            band_dir,
-            f"bulkflow_cut_{band_str}.h5"
-        )
-
-        column_name = f"V_band_{band_lo:.0f}_to_{band_hi:.0f}"
-
-        print(f"Processing band {band_lo:.0f} → {band_hi:.0f} km/s:")
-        print(f"HDF5: {hdf_file}")
-        print(f"Column prefix: {column_name}")
-
-        save_average_bulkflow_to_csv(
-            hdf_file=hdf_file,
-            csv_file=csv_file,
-            column_name=column_name,
-            mask_type="full",
-            key="bulkflow"
-        )
-    
-    plot_bulkflow_from_csv(
-        csv_file=csv_file,
-        output_folder=base_dir,
-        variable_name="local_bulkflow",
-        var_min=0,
-        var_max=1500,
-        var_step=100,
-        output_file="bulkflow_comparison.png",
-        plot_theory=True,
-        plot_errors=False,
-        error_alpha=0.25,
-        show_markers=False,
-    )
-
-def plot():
-
-    rockstar_path = os.path.expanduser(
-        "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/data/mdpl2_rockstar_125_pid-1_mvir12.csv"
-    )
-
-    halos_df = load_rockstar_catalog(rockstar_path)
-
-    box_size = 1000.0  # Mpc/h
-
-    # Overdensity cuts
-    overdensity_lower_cut = 100
-    overdensity_upper_cut = 200
-    delta_column = "delta_3"
-
-    #Mass cuts
-    mass_upper_cut = 16                # h^-1 Msun
-    mass_lower_cut = 12                # h^-1 Msun
-    halos_df['mvir'] = np.log10(halos_df['mvir'].astype(float))
-
-    #velocity cuts
-    bulkflow_upper_cut = 3500.0  # km/s
-    bulkflow_lower_cut = 2500.0   # km/s
-    bulkflow_column = "bulkflow_3"
-
-    # Virgo criteria
-    virgo_column = "near_virgo"
-    
-
-    # Fit Halos into box [0, box_size)
-    # halos_df[['x','y','z']] %= box_size
-
-    mask = (
-        # (halos_df["mvir"].between(mass_lower_cut, mass_upper_cut)) #&
-        # (halos_df[delta_column].between(overdensity_lower_cut, overdensity_upper_cut)) #&
-        (halos_df[bulkflow_column].between(bulkflow_lower_cut, bulkflow_upper_cut)) #&
-        # (halos_df[virgo_column] > 0)
-    )
-
-    candidates = halos_df.loc[mask]
-    candidates_df = halos_df.loc[candidates.index].copy()
-    print(f"Number of candidate origins after mass cut: {len(candidates_df)}")
-
-    plot_histogram(
-        data_df=candidates_df, 
-        output_folder= "/home/ofeke2000/BulkFlow_miniproject/BulkFlow_miniproject/output/local_bulkflow_histograms/", 
-        output_file=f"local_bulkflow_histogram_[{bulkflow_lower_cut:.0f},{bulkflow_upper_cut:.0f}]_with_{len(candidates_df)}_remaining_of_{len(halos_df)}_total.png", 
-        key=bulkflow_column,
-        origin=(0,0,0),
-        bins=50,
-        log_axis="none"
-        )
+    # Plot 2: chi2 biased U_tot vs noise-debiased U_deb (+ theory)
+    BulkFlowPlotter(
+        nc_file=NC_FILE,
+        output_folder=OUTPUT_FOLDER,
+        output_file=DEBIAS_PLOT_FILE,
+        methods=["chi2"],
+        plot_cfg=BulkFlowPlotConfig(show_markers=False),
+        cosmology_cfg=cosmology_cfg,
+        theory_cfg=theory_cfg,
+        style=style,
+    ).plot()
 
 
-# ------------------------------------------------------
-# Entry point
-# ------------------------------------------------------
 if __name__ == "__main__":
-
-    if do_main := True:
-        main()
-
-    if do_plot := False:
-        plot()
+    main()

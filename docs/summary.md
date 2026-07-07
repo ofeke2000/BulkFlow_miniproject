@@ -319,7 +319,49 @@ Options:
 
 ---
 
-## 6. Current Open Questions / TODOs
+## 6. Standalone Analyses (outside the main pipeline)
+
+These live in `scripts/analyses/`, are driven by their own `run_*.py` entry points at
+the repo root, and never touch the Rockstar catalog checkpoint:
+
+* **`velocity_comparison.py`** — chi^2 bulk flow computed directly on the
+  real CF4 "All Group Velocities" catalogue's own `Vpds`/`Vpwf` columns (no
+  MDPL2 halos, no PBC), observer fixed at the supergalactic origin.
+* **`velocity_redshift_binning.py`** — purely descriptive: bins the real
+  CF4 `Vpds`/`Vpwf` values against redshift/measured-distance/Hubble-distance
+  and plots binned means and raw scatter.
+* **`velocity_distance_mock.py`** — mock-observation test of whether the
+  trends in the real CF4 plots above are consistent with LambdaCDM once
+  measurement errors and the CF4 selection are included. Per
+  Local-Universe-like (or seeded-random) observer, it builds a CF4-like mock
+  catalogue from MDPL2 halos (`MaskMaker.make_cf4_mask`, positions treated as
+  true), forges the observed redshift from the *exact* FLRW truth
+  (`z_cos_true(r_true)` from colossus's exact comoving-distance relation,
+  peculiar velocity composed multiplicatively:
+  `(1+z_obs) = (1+z_cos_true)(1+v_r_true/c)`) and a noisy
+  distance-modulus-based measured distance (`D_meas`, using each matched CF4
+  group's own `eDM_av`, carried through the mask via a new
+  `cf4_carry_columns` option on `MaskMaker.make_cf4_mask`), and re-derives
+  `Vpds`/`Vpwf` analogs from `(cz_obs, D_meas)` with the same
+  Davis & Scrimgeour (2014)/Watkins & Feldman (2015) cosmographic correction
+  (`q0 = Om0/2 - Ode0`, `j0 = 1`) used on real data. The true `v_r` is kept as
+  a zero-error reference series. Output (per-observer, pooled, and a
+  CF4-overlay figure comparing mock vs. real binned means) goes to
+  `output/velocity comparison mock/`.
+
+  *Convention note*: the truth redshift is exact FLRW — deliberately *not*
+  generated with the estimators' own second-order cosmographic bracket — so
+  each estimator exhibits its honest intrinsic residual bias rather than
+  being zeroed by construction. A synthetic sanity check (zero eDM, zero true
+  velocity) finds `Vpds_mock`'s cosmographic inversion tracks exact FLRW very
+  closely (residual ~0 km/s at all relevant r), while `Vpwf_mock` carries a
+  genuine positive residual growing with distance (~ +20 km/s at r = 50,
+  ~ +190 km/s at r = 150 h⁻¹ Mpc) — a real feature of the estimator that the
+  mock is designed to expose, on top of the distance-error-driven trends.
+
+---
+
+## 7. Current Open Questions / TODOs
 
 ### Scientific
 

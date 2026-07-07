@@ -20,7 +20,7 @@ Config dataclasses mirroring `config.yaml`. Each section of the yaml has a corre
 | Dataclass | Purpose |
 |-----------|---------|
 | `MDPL2Config` | Fixed simulation box parameters (box_size, HubbleParameter) |
-| `CosmologyConfig` | Fixed MDPL2 cosmology (H0, Om0, growth_index, bulk_flow_amplitude_factor) — not user-edited |
+| `CosmologyConfig` | Fixed MDPL2 cosmology (H0, Om0, growth_index, bulk_flow_amplitude_factor, hubble_velocity_per_hinv_mpc) — not user-edited |
 | `TheoryConfig` | Colossus integration settings (z, k_min, k_max, k_limit) |
 | `VirgoTestConfig` | Virgo proximity test parameters (mass_threshold, r_min, r_max) |
 | `BulkFlowConfig` | Bulk flow estimator settings (radii, masks, error model) |
@@ -41,21 +41,24 @@ Main orchestration script that runs the entire bulk flow analysis pipeline. It i
 
 ### scripts/
 
-Directory containing modular pipeline stage scripts, each handling a specific phase of the analysis.
+Split into two sub-packages by kind:
 
-#### data_preprocessing.py
+- `scripts/pipeline/` — the modular pipeline stages run in sequence by `main.py`, each handling a specific phase of the analysis.
+- `scripts/analyses/` — standalone analyses outside the main pipeline, each driven by its own `run_*.py` entry point at the repo root.
+
+#### pipeline/data_preprocessing.py
 Loads the Rockstar halo catalog, applies mass cuts, builds a KDTree for spatial queries, and optionally loads CF4 catalog data. Returns processed dataframes and spatial index.
 
-#### environment_analysis.py
+#### pipeline/environment_analysis.py
 Computes environmental properties for each halo:
 - Local overdensity within specified radius
 - Near-Virgo cluster proximity test
 - Local bulk flow velocity
 
-#### origin_selection.py
+#### pipeline/origin_selection.py
 Selects origin points (halos) for bulk flow computation based on environmental criteria. Supports filtering by overdensity, mass, and local bulk flow, with options for lowest overdensity selection or random sampling.
 
-#### bulkflow_computation.py
+#### pipeline/bulkflow_computation.py
 Computes bulk flow time series for selected origins. Supports configurable masking modes:
 - "full": Full halo catalog
 - "cf4": CF4-based mask
@@ -64,12 +67,12 @@ Computes bulk flow time series for selected origins. Supports configurable maski
 
 Writes all results to a single self-describing netCDF file via `BulkFlowDataset`.
 
-#### postprocessing.py
+#### pipeline/postprocessing.py
 Reads the netCDF output via `BulkFlowDataset.open()`, bands origins by the run's
 `selection_variable`, computes per-band mean/std of U_tot, and writes a unified CSV
 for plotting. Generates final comparison plots.
 
-#### methods_comparison.py
+#### analyses/methods_comparison.py
 Standalone estimator-comparison analysis (`MethodsComparison` class), driven by
 the root `run_methods_comparison.py` entry point. Computes **both** the `chi2`
 and `mean` estimators for the *same* set of origins (full mask) and stores them
@@ -85,6 +88,140 @@ overwrite each other and the dataset sorts alongside its figures. Unlike
 `main.py`, it does **not** run the environmental analysis and does **not**
 overwrite the catalog checkpoint — it relies on the derived columns already
 present in the catalog CSV.
+
+#### analyses/velocity_comparison.py
+Standalone observational analysis (`VelocityComparison` class), driven by the
+root `run_velocity_comparison.py` entry point. Computes the **chi2** bulk flow
+**directly on the CF4 "All Group Velocities" catalogue** (no MDPL2 halos, no
+PBC) for two of its radial-peculiar-velocity columns — `Vpds` and `Vpwf` — and
+overlays them against ΛCDM theory in one plot. The observer is fixed at the
+supergalactic origin (us); positions come from RA/Dec/D (converted to h⁻¹ Mpc
+by `load_cf4_catalogue`), and the catalogue's own line-of-sight velocities are
+fed straight into `bulk_flow_chi2_cumulative` (bypassing the simulation-only
+`radial_velocity_and_error_pbc` projection). Per-object uncertainties are
+propagated from the distance-modulus error column `eDM`:
+`sigma_v = max((ln10/5)·(H0/h)·r·eDM, sigma_min)`. The two velocity estimators
+are stored as the dataset `method` dimension in a single netCDF, written
+alongside the PNG into `output/velocity comparison/`. Run-specific parameters
+(radial grid, velocity columns, the `ln10/5` factor) are `VelocityComparison`
+class attributes; `sigma_star`, `sigma_min`, cosmology, theory, and style come
+from the config. Like `methods_comparison.py`, it does **not** run the
+environmental analysis and does **not** overwrite the catalog checkpoint. It also
+emits a single overlaid histogram (object count vs velocity) comparing the raw
+`Vpds` and `Vpwf` columns via `plot_velocity_histograms` (output name/xlabel from
+the `HISTOGRAM_FILE`/`HISTOGRAM_XLABEL` class attributes), written alongside the
+comparison plot. The overlay uses the shared `plot_overlaid_histogram` helper,
+which draws each column as a step histogram on common bins.
+
+#### analyses/velocity_redshift_binning.py
+Standalone descriptive-statistics analysis (`VelocityRedshiftBinning` class),
+driven by the root `run_velocity_redshift_binning.py` entry point. Unlike
+`velocity_comparison.py`, it does **not** run the chi^2 bulk-flow estimator —
+it studies the raw `Vpds`/`Vpwf` columns against each of the x-axes declared
+in the `X_AXES` class attribute (a tuple of axis specs: dataframe column,
+title name, axis label, filename tag, scatter fractions):
+
+- `z` — redshift from the CMB-frame velocity, `z = Vcmb / c`;
+- `D` — the catalogue's measured distance (Mpc, from the distance modulus).
+  **Not** equivalent to binning by `z`: `D` carries the large distance errors
+  that also drive the `Vpds`/`Vpwf` values, so binning by measured `D`
+  reorders points and exposes the correlated-error (Malmquist-like) trend;
+- `d_cz` — Hubble distance `cz/H0` (Mpc, `H0_KM_S_MPC` = 74.6, CF4's own
+  calibration) — a pure rescaling of the `z` axis for unit-matched comparison
+  with the `D` axis.
+
+Per axis it produces two views:
+
+- **Binned means**: groups are binned in the axis variable (equal-width or
+  quantile, CLI-selectable), and per bin it computes both the signed mean and
+  the mean of the absolute value of each velocity column, each with its
+  standard error of the mean (bins with fewer than `min_n_per_bin` groups are
+  skipped and logged). Rendered as two figures (signed and `|v|`) via the
+  shared `_plot_binned` helper, plus a CSV table with bin
+  x-mean/N/mean/SEM/mean-abs/SEM-abs.
+- **Raw scatter**: every group's velocity vs the axis variable at the axis's
+  point-retention fractions (100%/50%/10% for `z`; 10% only for the two
+  distance axes), one PNG per fraction, via `plot_scatter`. All fractions are
+  `df.sample(...)` from the same full dataframe with the same
+  `SCATTER_RANDOM_SEED`, so the 10% points are a subset of the 50% points.
+
+Filenames are built from templates keyed on the axis tag
+(`velocity_vs_{tag}_binned.png`, `velocity_vs_{tag}_scatter_{pct}pct.png`, …),
+so one run writes the complete set for every axis side by side. It has no
+dependency on `AppConfig`/`config.yaml`: input path, bin count, binning mode,
+and the minimum-N threshold are `VelocityRedshiftBinning` class attributes,
+overridable via CLI flags (`--input`, `--bins`, `--mode`, `--min-n-per-bin`).
+Per-column labels/markers are looked up from the `LABELS`/`MARKERS`
+class-attribute dicts, so `_draw_series` (and `plot_scatter`) loop generically
+over `VELOCITY_COLUMNS` rather than hard-coding two series. Reads the raw
+catalogue via the shared `read_cf4_csv` helper (renamed from the
+module-private `_read_cf4_csv` in `src/io/data_loader.py`, now also used by
+`load_cf4_catalogue`). All output is written alongside the
+`velocity_comparison.py` outputs, into `output/velocity comparison/`.
+`bin_and_aggregate` takes an optional explicit `edges` argument (defaulting to
+`None`, which preserves the original per-dataframe auto-binning behaviour) so
+`VelocityDistanceMock` can reuse it with a *shared* bin-edge set across
+several dataframes.
+
+#### analyses/velocity_distance_mock.py
+Mock-observation analysis (`VelocityDistanceMock` class, subclasses
+`VelocityRedshiftBinning` to reuse its binning/table/figure machinery),
+driven by the root `run_velocity_distance_mock.py` entry point. Builds mock
+CF4 "peculiar velocity vs measured distance" catalogues from MDPL2 Rockstar
+halos, to test whether the trends seen in the real CF4 plots
+(`velocity_redshift_binning.py`) are consistent with LambdaCDM once
+measurement errors and the CF4 selection function are included. Per observer
+(a Local-Universe-like halo selected via `origin_selection.select_origin_points`
+if the catalog's cached `delta_*`/`bulkflow_*`/`near_virgo` columns are
+present, else a seeded-random halo -- the path taken is logged):
+
+1. A CF4-like mock catalogue is built around the observer with
+   `MaskMaker.make_cf4_mask` (CF4 sky geometry shifted to the observer, mod
+   box, matched halo velocities; positions are treated as true positions).
+2. The true PBC distance `r_true` and true line-of-sight velocity `v_r_true`
+   come from `radial_velocity_and_error_pbc`.
+3. The truth redshift is exact FLRW at the MDPL2 cosmology:
+   `z_cos_true(r_true)` inverts colossus's exact comoving-distance relation
+   (interpolated on a fine z grid; colossus's native distance unit is
+   h^-1 Mpc, matching `r_true`), and the peculiar velocity composes
+   multiplicatively, `(1 + z_obs) = (1 + z_cos_true)(1 + v_r_true/c)`, so
+   `cz_obs = c z_obs` (box frame stands in for the CMB frame; the observer's
+   own velocity is not subtracted). Blueshifted objects (`cz_obs <= 0`,
+   undefined under Vpwf's log) are dropped and logged.
+4. `D_meas = r_true * 10**(delta_mu/5)`, `delta_mu ~ N(0, eDM_av)`, where
+   `eDM_av` is the matched CF4 group's own distance-modulus error, carried
+   through the mask via `MaskMaker.make_cf4_mask`'s new `cf4_carry_columns`
+   argument (deterministic per-object pairing, not resampled from the eDM
+   distribution). The RNG is seeded `seed + observer_id` for reproducibility.
+5. `Vpds`/`Vpwf` analogs are re-derived from `(cz_obs, D_meas)` using the same
+   second-order cosmographic correction (Davis & Scrimgeour 2014 Eq. 14;
+   Watkins & Feldman 2015), parameterized by `q0 = Om0/2 - Ode0` and `j0 = 1`
+   (flat LambdaCDM). The true `v_r_true` is kept as a zero-error reference
+   series (`VELOCITY_COLUMNS = (Vpds_mock, Vpwf_mock, v_r_true)`).
+
+Three views are rendered, reusing the parent's `bin_and_aggregate`/
+`save_table`/`plot`/`plot_abs`/`plot_scatter`/`_draw_series`/`_save_figure`:
+per-observer binned means + scatter (one subfolder per observer, mirroring
+the CF4 script's own figures); pooled binned means over all observers with
+each observer's own curve overlaid (shared bin edges via
+`bin_and_aggregate(..., edges=...)`, new `plot_pooled_with_observers`); and a
+CF4-overlay figure (`plot_cf4_overlay`) comparing the mock binned means +/-
+SEM *across observers* against the real CF4 binned means from
+`VelocityRedshiftBinning` on the same axes (the key deliverable) -- CF4's
+Mpc-based `D`/`d_cz` axes are converted to h^-1 Mpc with the MDPL2 `h` for
+the comparison. All distances within the mock stay in h^-1 Mpc. Output goes
+to `output/velocity comparison mock/`. Read-only on the Rockstar catalog: no
+checkpoint is overwritten, and no environmental analysis is (re-)run.
+
+Convention note (documented in the module docstring): the truth redshift is
+exact FLRW (multiplicative peculiar-velocity composition), deliberately *not*
+generated with the estimators' own second-order cosmographic bracket, so each
+estimator exhibits its honest intrinsic residual bias rather than being zeroed
+by construction. `Vpds_mock`'s cosmographic inversion tracks exact FLRW very
+closely at these redshifts (residual ~0 km/s), while `Vpwf_mock` carries a
+genuine positive residual growing with distance (~ +20 km/s at r = 50,
+~ +190 km/s at r = 150 h^-1 Mpc, at zero true velocity and zero eDM) -- a real
+feature of the estimator that the mock is designed to expose.
 
 ### src/
 

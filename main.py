@@ -8,11 +8,11 @@ import logging
 import time
 import numpy as np
 
-from scripts.data_preprocessing import load_config, preprocess_data, save_catalog_checkpoint
-from scripts.environment_analysis import compute_environmental_tests
-from scripts.origin_selection import select_origin_points
-from scripts.bulkflow_computation import compute_bulkflows_for_origins
-from scripts.postprocessing import aggregate_results, create_final_plots
+from scripts.pipeline.data_preprocessing import load_config, preprocess_data, save_catalog_checkpoint
+from scripts.pipeline.environment_analysis import compute_environmental_tests
+from scripts.pipeline.origin_selection import select_origin_points
+from scripts.pipeline.bulkflow_computation import compute_bulkflows_for_origins
+from scripts.pipeline.postprocessing import aggregate_results, create_final_plots
 from src.viz.visualize import BulkFlowPlotter
 from src.config import BulkFlowPlotConfig
 

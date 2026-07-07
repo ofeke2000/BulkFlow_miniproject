@@ -34,7 +34,7 @@ def load_rockstar_catalog(path: str, columns=None) -> pd.DataFrame:
     return df
 
 
-def _read_cf4_csv(path: str) -> pd.DataFrame:
+def read_cf4_csv(path: str) -> pd.DataFrame:
     with open(path, 'r', encoding='utf-8', errors='ignore') as f:
         first_line = f.readline()
         second_line = f.readline()
@@ -71,7 +71,7 @@ def load_cf4_catalogue(path: str, h: float = 0.7) -> pd.DataFrame:
         DataFrame with Cartesian coordinates in columns ['x', 'y', 'z'].
     """
     print(f"Loading CF4 catalogue from {path}...")
-    df = _read_cf4_csv(path)
+    df = read_cf4_csv(path)
     print(f"Loaded {len(df):,} CF4 entries.")
 
     # Normalize column names

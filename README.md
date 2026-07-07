@@ -20,7 +20,9 @@ step 3 **overwrites the Rockstar catalog CSV in `data/`** — see [CLAUDE.md](CL
 ```
 main.py            pipeline orchestration (preprocessing → analysis → bulk flow → plots)
 config.yaml        all tunable parameters
-scripts/           one module per pipeline stage
+scripts/
+  pipeline/        one module per pipeline stage
+  analyses/        standalone analyses, each driven by a root run_*.py entry point
 src/
   physics/         bulk-flow estimators, theory, overdensity, near-Virgo, masks, PBC primitives
   io/              catalog loaders + general utilities

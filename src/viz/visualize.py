@@ -528,6 +528,56 @@ def plot_histogram(
     plt.close()
 
 
+def plot_overlaid_histogram(
+    data_df: pd.DataFrame,
+    keys: list[str],
+    output_folder: str = "plots",
+    output_file: str = "overlaid_histogram.png",
+    xlabel: str = "Value",
+    title: str | None = None,
+    bins=None,
+    log_axis: str | bool = False,
+    style: PlotStyleConfig | None = None,
+) -> None:
+    """Overlay several columns as step histograms on shared bins for comparison."""
+    if style is None:
+        style = PlotStyleConfig()
+    if bins is None:
+        bins = style.histogram_bins
+
+    # Shared bin edges across all keys so the curves are directly comparable.
+    finite_values = np.concatenate(
+        [data_df[key].values[np.isfinite(data_df[key].values)] for key in keys]
+    )
+    bin_edges = np.histogram_bin_edges(finite_values, bins=bins)
+
+    plt.figure(figsize=style.histogram_figsize)
+    for key in keys:
+        values = data_df[key].values
+        plt.hist(
+            values[np.isfinite(values)],
+            bins=bin_edges,
+            histtype="step",
+            label=key,
+        )
+
+    if log_axis in ("y", "all"):
+        plt.yscale("log")
+    if log_axis in ("x", "all"):
+        plt.xscale("log")
+
+    plt.xlabel(xlabel)
+    plt.ylabel("Number of Objects")
+    plt.title(title or output_file.replace("_", " ").replace(".png", ""))
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=style.grid_alpha)
+
+    os.makedirs(output_folder, exist_ok=True)
+    output_path = os.path.join(output_folder, output_file)
+    plt.savefig(output_path, dpi=style.dpi_normal)
+    plt.close()
+
+
 # ===========================================================================
 # Simulation slice heatmap
 # ===========================================================================

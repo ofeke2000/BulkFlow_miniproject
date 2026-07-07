@@ -28,7 +28,7 @@ from src.data.bulkflow_dataset import BulkFlowDataset
 from src.physics.bulkflow import calculate_bulk_flow_series
 from src.viz.visualize import BulkFlowPlotter, FacetSet
 from src.config import BulkFlowPlotConfig
-from scripts.bulkflow_computation import _build_result, _build_dataset_attrs
+from scripts.pipeline.bulkflow_computation import _build_result, _build_dataset_attrs
 
 
 class MethodsComparison:

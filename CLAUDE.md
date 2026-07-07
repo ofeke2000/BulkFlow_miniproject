@@ -29,7 +29,7 @@ python main.py        # run from the repo root; config.yaml is loaded by relativ
 
 - `main.py` — orchestrates the pipeline: preprocessing → environmental
   analysis → origin selection → bulk flow computation → postprocessing/plots
-- `scripts/` — one module per pipeline stage
+- `scripts/pipeline/` — one module per pipeline stage; `scripts/analyses/` — standalone analyses, each driven by a root `run_*.py` entry point
 - `src/` — library code, grouped into sub-packages:
   - `src/physics/` — bulk-flow estimators, theoretical predictions, overdensity, near-Virgo, masks, PBC primitives
   - `src/io/` — catalog loaders and general utilities

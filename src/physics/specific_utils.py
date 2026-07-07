@@ -167,7 +167,7 @@ def radial_velocity_and_error_pbc(
     # Distance-based error model:
     #   sigma_i = max( (H0/h) * r_i * error_frac , min_sigma )
     # H0/h converts h^-1 Mpc to km/s (≈ 100 km/s per h^-1 Mpc for MDPL2).
-    hubble_velocity_per_dist = CosmologyConfig().H0 / MDPL2Config().HubbleParameter
+    hubble_velocity_per_dist = CosmologyConfig().hubble_velocity_per_hinv_mpc
     sigma = np.maximum(hubble_velocity_per_dist * r_norm * error_frac, min_sigma)
 
     # -----------------------------

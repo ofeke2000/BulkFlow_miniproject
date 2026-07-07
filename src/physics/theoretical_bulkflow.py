@@ -40,7 +40,9 @@ def theoretical_bulkflow_colossus(
     cosmo = cosmology.getCurrent()
 
     f = cosmo.Om(theory_cfg.z) ** cosmology_cfg.growth_index
-    H0 = cosmo.H0  # km/s/Mpc
+    # Colossus P(k) is in (h⁻¹ Mpc)³ and k in h/Mpc, so the velocity
+    # prefactor must be H0/h = 100 km/s per h⁻¹ Mpc (not H0 = 67.77).
+    H0_over_h = cosmology_cfg.hubble_velocity_per_hinv_mpc
 
     def W(k, R):
         x = k * R
@@ -61,7 +63,7 @@ def theoretical_bulkflow_colossus(
             limit=theory_cfg.k_limit
         )
 
-        sigma2_v = (H0**2 * f**2 / (2.0 * np.pi**2)) * integral
+        sigma2_v = (H0_over_h**2 * f**2 / (2.0 * np.pi**2)) * integral
         sigma_v.append(np.sqrt(sigma2_v))
 
     return np.array(sigma_v)
