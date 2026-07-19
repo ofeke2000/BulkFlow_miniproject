@@ -64,3 +64,8 @@ python main.py        # run from the repo root; config.yaml is loaded by relativ
 - Bulk flow = average velocity vector of halos inside radius R around an observer
 - Small-scale velocity noise: σ* ≈ 250 km/s (configurable)
 - Two bulk flow estimators: `chi2` (ML / χ² with LU solve, cumulative in radius) and `mean`
+
+## Agent workflow
+
+- Delegate implementation work (writing/editing code) to a Sonnet subagent.
+- Delegate code review to an Opus subagent.

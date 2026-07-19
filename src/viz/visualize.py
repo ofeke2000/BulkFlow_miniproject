@@ -124,24 +124,38 @@ class BulkFlowPlotter:
     _TEXTBOX_FONTSIZE: int = 8
     _TEXTBOX_ALPHA: float = 0.8
     _COLORBAR_PAD: float = 0.02
+    _DEFAULT_TITLE: str = "Bulk Flow vs Radius"
+    _DEFAULT_XLABEL: str = r"Radius [$h^{-1}$ Mpc]"
 
     def __init__(
         self,
         nc_file: str,
         output_folder: str,
         output_file: str | None = None,
+        title: str | None = None,
+        xlabel: str | None = None,
         methods: list[str] | None = None,
         band_bins: np.ndarray | None = None,
         plot_cfg: BulkFlowPlotConfig | None = None,
         cosmology_cfg: CosmologyConfig | None = None,
         theory_cfg: TheoryConfig | None = None,
         style: PlotStyleConfig | None = None,
+        method_colors: dict[str, str] | None = None,
+        method_linestyles: dict[str, str] | None = None,
     ) -> None:
         self._nc_file = nc_file
         self._output_folder = output_folder
         self._output_file = output_file
+        self._title = title
+        self._xlabel = xlabel
         self._methods = methods
         self._band_bins = band_bins
+        # Optional per-method style overrides (default None => auto behavior).
+        # Keyed by the curve's `method` label (e.g. "Vpds_chi2"); when set and
+        # matched, they replace the auto prop-cycle color / debiased linestyle
+        # in the non-colorbar branch of _draw_curves only.
+        self._method_colors = method_colors
+        self._method_linestyles = method_linestyles
         cfg = plot_cfg or BulkFlowPlotConfig()
         self._plot_theory = cfg.plot_theory
         self._use_mean_amplitude = cfg.use_mean_amplitude
@@ -198,9 +212,9 @@ class BulkFlowPlotter:
 
         self._draw_textbox(ax, facet_set)
 
-        ax.set_xlabel(r"Radius [$h^{-1}$ Mpc]")
+        ax.set_xlabel(self._xlabel or self._DEFAULT_XLABEL)
         ax.set_ylabel(r"$|U|$ [km/s]")
-        ax.set_title("Bulk Flow vs Radius")
+        ax.set_title(self._title or self._DEFAULT_TITLE)
         ax.grid(True)
         fig.tight_layout()
 
@@ -368,6 +382,7 @@ class BulkFlowPlotter:
 
         for cs in curve_specs:
             radii, values = cs["data"]
+            method = cs["facets"].get("method")
             is_debiased = cs["facets"].get("estimator") == "debiased"
             linestyle = "--" if is_debiased else "-"
             alpha = self._style.curve_alpha if cs.get("is_individual") else 1.0
@@ -375,8 +390,17 @@ class BulkFlowPlotter:
             color = (
                 cmap(norm(cs["facets"]["sel_band_mid"]))
                 if uses_colorbar
-                else cat_color[(cs["facets"].get("mask"), cs["facets"].get("method"))]
+                else cat_color[(cs["facets"].get("mask"), method)]
             )
+
+            # Optional per-method style overrides (non-colorbar branch only).
+            # Leave the auto-assigned color/linestyle untouched when the maps
+            # are absent or the method isn't listed, preserving existing callers.
+            if not uses_colorbar:
+                if self._method_colors is not None and method in self._method_colors:
+                    color = self._method_colors[method]
+                if self._method_linestyles is not None and method in self._method_linestyles:
+                    linestyle = self._method_linestyles[method]
 
             label_str = facet_set.legend_label(cs["facets"])
             label = label_str if (label_str and label_str not in labels_drawn) else None

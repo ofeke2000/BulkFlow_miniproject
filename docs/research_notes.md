@@ -9,3 +9,8 @@ then by Virgo
 # 06.07.2026
 
 make plots of h^-1Mpc, understand reference frames and that the code is ok
+
+# 12.07.2026
+
+check errors calculation!
+Adi says that everybody is doing it wrong, i need to use somthing else

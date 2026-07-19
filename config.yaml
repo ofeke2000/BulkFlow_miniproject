@@ -18,7 +18,7 @@ bulkflow:
   radii_step: 5.0           # h^-1 Mpc
   error_fraction: 0.2        # 20%
   sigma_star: 250.0          # km/s
-  sigma_min: 50.0            # km/s
+  sigma_min_fraction: 0.10   # velocity_comparison floor: fraction of (H0_CF4/h)*r_scheme
   calculation_method: "chi2"  # "chi2" or "mean"
   cf4_match_radius: 5.0      # h^-1 Mpc for CF4 masking
   cf4_match_max_doublings: 5

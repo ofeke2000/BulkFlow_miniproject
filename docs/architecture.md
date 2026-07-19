@@ -20,7 +20,8 @@ Config dataclasses mirroring `config.yaml`. Each section of the yaml has a corre
 | Dataclass | Purpose |
 |-----------|---------|
 | `MDPL2Config` | Fixed simulation box parameters (box_size, HubbleParameter) |
-| `CosmologyConfig` | Fixed MDPL2 cosmology (H0, Om0, growth_index, bulk_flow_amplitude_factor, hubble_velocity_per_hinv_mpc) — not user-edited |
+| `CosmologyConfig` | Fixed MDPL2 cosmology (H0, Om0, growth_index, bulk_flow_amplitude_factor, hubble_velocity_per_hinv_mpc); also carries CF4's own calibrated Hubble constant (H0_CF4, `cf4_hubble_velocity_per_hinv_mpc` = H0_CF4/h) for the CF4-facing velocity analyses — not user-edited |
+| `PhysicalConstants` | Fixed universal physical constants (SPEED_OF_LIGHT_KM_S), independent of cosmology — not user-edited |
 | `TheoryConfig` | Colossus integration settings (z, k_min, k_max, k_limit) |
 | `VirgoTestConfig` | Virgo proximity test parameters (mass_threshold, r_min, r_max) |
 | `BulkFlowConfig` | Bulk flow estimator settings (radii, masks, error model) |
@@ -91,21 +92,74 @@ present in the catalog CSV.
 
 #### analyses/velocity_comparison.py
 Standalone observational analysis (`VelocityComparison` class), driven by the
-root `run_velocity_comparison.py` entry point. Computes the **chi2** bulk flow
+root `run_velocity_comparison.py` entry point. Computes the bulk flow
 **directly on the CF4 "All Group Velocities" catalogue** (no MDPL2 halos, no
-PBC) for two of its radial-peculiar-velocity columns — `Vpds` and `Vpwf` — and
-overlays them against ΛCDM theory in one plot. The observer is fixed at the
+PBC) for two of its radial-peculiar-velocity columns — `Vpds` and `Vpwf` —
+each run through **both** the `chi2` and `mean` estimators, and overlays them
+against ΛCDM theory. The observer is fixed at the
 supergalactic origin (us); positions come from RA/Dec/D (converted to h⁻¹ Mpc
 by `load_cf4_catalogue`), and the catalogue's own line-of-sight velocities are
 fed straight into `bulk_flow_chi2_cumulative` (bypassing the simulation-only
 `radial_velocity_and_error_pbc` projection). Per-object uncertainties are
-propagated from the distance-modulus error column `eDM`:
-`sigma_v = max((ln10/5)·(H0/h)·r·eDM, sigma_min)`. The two velocity estimators
-are stored as the dataset `method` dimension in a single netCDF, written
-alongside the PNG into `output/velocity comparison/`. Run-specific parameters
-(radial grid, velocity columns, the `ln10/5` factor) are `VelocityComparison`
-class attributes; `sigma_star`, `sigma_min`, cosmology, theory, and style come
-from the config. Like `methods_comparison.py`, it does **not** run the
+propagated from the distance-modulus error column `eDM`, floored by a
+distance-proportional term:
+`sigma_v = max((ln10/5)·(H0_CF4/h)·r·eDM, sigma_min_fraction·(H0_CF4/h)·r_scheme)`,
+using CF4's own calibrated Hubble constant
+(`cfg.cosmology.cf4_hubble_velocity_per_hinv_mpc`, Tully et al. 2023) rather
+than the MDPL2 `hubble_velocity_per_hinv_mpc`. The eDM term always uses the
+*measured* distance `r`; the floor (`cfg.bulkflow.sigma_min_fraction`, default
+0.10) uses each group's *scheme* radius `r_scheme` — it replaced the previous
+flat `sigma_min` floor, which the MDPL2 pipeline still uses unchanged (the
+`sigma_min` field stays in `BulkFlowConfig` with its default).
+
+Each group is additionally placed at a radial coordinate via one of **two
+distance-placement schemes** (`DISTANCE_SCHEMES = ("d", "cz")`), sharing the
+same `r_hat` line-of-sight unit vectors and the same eDM sigma term (a
+property of the measurement, not of placement), while the
+`sigma_min_fraction` floor — and hence `sigma_v` itself — is per-scheme (a
+property of placement; both are built by the `_scheme_radii`/`_sigma_model`
+helpers, shared with `plot_sigma_terms`). The radius used for the validity
+cut/sorting/cumulative binning also differs: `"d"` is the original **measured
+distance** `r = |x, y, z|` (from `D`/distance modulus, `r > 0` cut); `"cz"` is
+the **redshift distance** `r_z = vcmb / (H0_CF4/h)` (from the catalogue's
+`vcmb` column and `cfg.cosmology.cf4_hubble_velocity_per_hinv_mpc`, CF4's
+calibrated Hubble constant over the MDPL2 h, `vcmb > 0` cut). The
+resulting 8 (column, estimator, scheme) series are stored on the dataset
+`method` dimension in a single netCDF — the `"d"` scheme keeps the original,
+unsuffixed label shape `f"{col}_{estimator}"` (e.g. `Vpds_chi2`) for backward
+compatibility, while `"cz"` appends a `"_cz"` suffix (e.g. `Vpds_chi2_cz`).
+Labels are built/parsed via the `_make_label`/`_parse_label` helper pair
+(rather than blind string splitting) so a 3rd, scheme-suffix segment doesn't
+break label parsing.
+
+From that one netCDF, **four** PNGs are rendered into
+`output/velocity comparison/`: a measured-distance chi2-only plot
+(`CHI2_PLOT_FILE`, just `Vpds_chi2`/`Vpwf_chi2`), a measured-distance
+both-methods plot (`BOTH_METHODS_PLOT_FILE`, all four measured-distance
+curves), and a redshift-distance chi2-only plot (`CHI2_CZ_PLOT_FILE`, just
+`Vpds_chi2_cz`/`Vpwf_chi2_cz`) — the `"cz"` counterpart of `CHI2_PLOT_FILE`,
+both columns together rather than split per column — plus a **sigma
+diagnostic** (`SIGMA_PLOT_FILE`, via `plot_sigma_terms`): one panel per
+distance scheme (shared y-axis), scattering the shared eDM sigma term against
+that scheme's radius, with the per-scheme `sigma_min_fraction` floor as a
+solid line through the origin, the old flat `sigma_min` as a dotted gray
+reference, and the floor-domination percentage in each panel title. In the
+three comparison plots
+**color encodes the velocity column** (`Vpds` blue, `Vpwf` orange).
+`CHI2_PLOT_FILE`/`BOTH_METHODS_PLOT_FILE` use the default **linestyle encodes
+the estimator** (`chi2` solid, `mean` dashed) styling; `CHI2_CZ_PLOT_FILE`
+instead explicitly passes `linestyle_by=_LINESTYLE_BY_SCHEME`, so its curves
+render dashed (via `SCHEME_LINESTYLES["cz"] = "--"`) and are visually
+distinct from `CHI2_PLOT_FILE`'s solid curves even though both plots contain
+only chi2-estimator curves. All three are supplied to `BulkFlowPlotter` via
+its optional `method_colors`/`method_linestyles` override maps, built by
+`_style_maps` (parameterized by `linestyle_by`) from the
+`COLUMN_COLORS`/`METHOD_LINESTYLES`/`SCHEME_LINESTYLES` class attributes.
+Run-specific parameters (radial grid, velocity columns, distance schemes, the
+`ln10/5` factor, color/linestyle maps, plot filenames and sigma-diagnostic
+styling) are `VelocityComparison`
+class attributes; `sigma_star`, `sigma_min_fraction`, cosmology, theory, and
+style come from the config. Like `methods_comparison.py`, it does **not** run the
 environmental analysis and does **not** overwrite the catalog checkpoint. It also
 emits a single overlaid histogram (object count vs velocity) comparing the raw
 `Vpds` and `Vpwf` columns via `plot_velocity_histograms` (output name/xlabel from
@@ -126,9 +180,9 @@ title name, axis label, filename tag, scatter fractions):
   **Not** equivalent to binning by `z`: `D` carries the large distance errors
   that also drive the `Vpds`/`Vpwf` values, so binning by measured `D`
   reorders points and exposes the correlated-error (Malmquist-like) trend;
-- `d_cz` — Hubble distance `cz/H0` (Mpc, `H0_KM_S_MPC` = 74.6, CF4's own
-  calibration) — a pure rescaling of the `z` axis for unit-matched comparison
-  with the `D` axis.
+- `d_cz` — Hubble distance `cz/H0` (Mpc, `H0_KM_S_MPC`, sourced in `__init__`
+  from `CosmologyConfig.H0_CF4` = 74.6, CF4's own calibration) — a pure
+  rescaling of the `z` axis for unit-matched comparison with the `D` axis.
 
 Per axis it produces two views:
 
@@ -297,7 +351,7 @@ General utility functions:
 Visualization utilities. Bulk-flow plotting is consolidated in two classes:
 
 - `FacetSet` — classifies each facet (mask / method / estimator / sigma\_star / N / selection\_variable) as CONSTANT or VARYING across the curves in a figure. Constant facets go to the output filename and a corner annotation box; varying categorical facets go to legend labels; a varying selection-variable band goes to a colorbar.
-- `BulkFlowPlotter` — reads directly from a `BulkFlowDataset` netCDF. Supports mean-over-origins mode, all-curves mode, and banded mode (`band_bins` triggers `groupby_bins` by the dataset's `selection_variable`). Assigns colors from the default prop cycle for categorical facets, or from a colormap when the selection-variable band varies. All behavioral flags/options (`plot_theory`, `use_mean_amplitude`, `plot_variance_band`, `variance_alpha`, `plot_all_curves`, `plot_debiased`, `show_markers`, `append_facets_to_filename`) are bundled in the `BulkFlowPlotConfig` dataclass (`src/config/visualization_config.py`), passed via the `plot_cfg` argument; call sites override only the fields they need. The `plot_debiased` flag (default `True`) controls whether the chi2 `U_deb` curve is drawn alongside `U_tot`; set it `False` for a clean estimator-vs-theory comparison. The `append_facets_to_filename` flag (default `True`) appends the constant-facet summary (the same key/value pairs shown in the corner textbox — N, mask, method/estimator, sigma_star, selection_variable) to the output filename, keeping each PNG self-describing and ensuring runs with different constants never overwrite each other. Four layout constants (`_TEXTBOX_X/Y`, `_TEXTBOX_FONTSIZE`, `_TEXTBOX_ALPHA`, `_COLORBAR_PAD`) live as class attributes.
+- `BulkFlowPlotter` — reads directly from a `BulkFlowDataset` netCDF. Supports mean-over-origins mode, all-curves mode, and banded mode (`band_bins` triggers `groupby_bins` by the dataset's `selection_variable`). Assigns colors from the default prop cycle for categorical facets, or from a colormap when the selection-variable band varies. Two optional constructor args, `method_colors`/`method_linestyles` (both default `None`, keyed by the curve's `method` label), override the auto-assigned color and total-vs-debiased linestyle per method in the non-colorbar branch only; when unset (all existing callers, incl. the main pipeline) behavior is unchanged. All behavioral flags/options (`plot_theory`, `use_mean_amplitude`, `plot_variance_band`, `variance_alpha`, `plot_all_curves`, `plot_debiased`, `show_markers`, `append_facets_to_filename`) are bundled in the `BulkFlowPlotConfig` dataclass (`src/config/visualization_config.py`), passed via the `plot_cfg` argument; call sites override only the fields they need. The `plot_debiased` flag (default `True`) controls whether the chi2 `U_deb` curve is drawn alongside `U_tot`; set it `False` for a clean estimator-vs-theory comparison. The `append_facets_to_filename` flag (default `True`) appends the constant-facet summary (the same key/value pairs shown in the corner textbox — N, mask, method/estimator, sigma_star, selection_variable) to the output filename, keeping each PNG self-describing and ensuring runs with different constants never overwrite each other. Four layout constants (`_TEXTBOX_X/Y`, `_TEXTBOX_FONTSIZE`, `_TEXTBOX_ALPHA`, `_COLORBAR_PAD`) live as class attributes.
 
 Module-level helpers retained: `plot_histogram`, `plot_simulation_slice_heatmap`.
 

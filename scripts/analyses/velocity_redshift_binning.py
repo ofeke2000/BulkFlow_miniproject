@@ -43,7 +43,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from src.config.cosmology_config import CosmologyConfig
 from src.config.paths_config import DEFAULT_CF4_VELOCITIES_CATALOG, DEFAULT_OUTPUT_FOLDER
+from src.config.physical_constants import PhysicalConstants
 from src.io.data_loader import read_cf4_csv
 
 
@@ -56,11 +58,13 @@ class VelocityRedshiftBinning:
     since it does not touch the simulation, cosmology, or theory machinery.
     """
 
-    # --- Physical constants ---
-    SPEED_OF_LIGHT_KM_S: float = 299792.458
-    # CF4's own distance-ladder calibration (Tully et al. 2023), so the
-    # cz/H0 axis is in the same Mpc scale as the catalogue's D column.
-    H0_KM_S_MPC: float = 74.6
+    # --- Physical constants (SPEED_OF_LIGHT_KM_S) / cosmology (H0_KM_S_MPC)
+    # are set in __init__ from PhysicalConstants / CosmologyConfig.H0_CF4
+    # rather than hardcoded here, per the project's no-bare-numbers rule.
+    # H0_KM_S_MPC is CF4's own distance-ladder calibration (Tully et al.
+    # 2023), so the cz/H0 axis is in the same Mpc scale as the catalogue's D
+    # column. This script works in plain Mpc (not h^-1 Mpc), so it uses the
+    # plain H0_CF4, not the /h property used by the h^-1-Mpc-based analyses. ---
 
     # --- Columns read from the raw CF4 "All Group Velocities" catalogue ---
     ID_COLUMN: str = "pgc"
@@ -151,6 +155,8 @@ class VelocityRedshiftBinning:
         min_n_per_bin: int | None = None,
         output_folder: str | None = None,
     ) -> None:
+        self.SPEED_OF_LIGHT_KM_S = PhysicalConstants().SPEED_OF_LIGHT_KM_S
+        self.H0_KM_S_MPC = CosmologyConfig().H0_CF4
         self._input_path = input_path or DEFAULT_CF4_VELOCITIES_CATALOG
         self._n_bins = n_bins or self.DEFAULT_N_BINS
         self._binning_mode = binning_mode or self.DEFAULT_BINNING_MODE

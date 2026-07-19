@@ -4,6 +4,7 @@ from .cosmology_config import CosmologyConfig
 from .mdpl2_config import MDPL2Config
 from .origin_config import OriginConfig
 from .paths_config import PathsConfig, ROCKSTAR_COLUMNS
+from .physical_constants import PhysicalConstants
 from .postprocessing_config import PostprocessingConfig
 from .theory_config import TheoryConfig
 from .virgo_config import VirgoTestConfig
@@ -22,6 +23,7 @@ __all__ = [
     "OriginConfig",
     "PathsConfig",
     "ROCKSTAR_COLUMNS",
+    "PhysicalConstants",
     "PostprocessingConfig",
     "TheoryConfig",
     "VirgoTestConfig",

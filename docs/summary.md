@@ -326,7 +326,15 @@ the repo root, and never touch the Rockstar catalog checkpoint:
 
 * **`velocity_comparison.py`** — chi^2 bulk flow computed directly on the
   real CF4 "All Group Velocities" catalogue's own `Vpds`/`Vpwf` columns (no
-  MDPL2 halos, no PBC), observer fixed at the supergalactic origin.
+  MDPL2 halos, no PBC), observer fixed at the supergalactic origin; also
+  compares placing groups at their measured distance vs. redshift distance
+  (`cz/H`). Per-object sigma combines the eDM measurement-error term (from
+  the measured distance, shared across schemes) with a per-scheme
+  distance-proportional floor — `sigma_min_fraction` (default 10%) of the
+  Hubble velocity at each group's scheme radius, replacing the old flat
+  `sigma_min` floor — and a dedicated diagnostic plot
+  (`sigma_edm_vs_distance_floor.png`) shows both sigma ingredients per
+  scheme with the floor-domination percentage.
 * **`velocity_redshift_binning.py`** — purely descriptive: bins the real
   CF4 `Vpds`/`Vpwf` values against redshift/measured-distance/Hubble-distance
   and plots binned means and raw scatter.
